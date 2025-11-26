@@ -16,7 +16,10 @@ const Icons = {
   Edit: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
   Check: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
   Plus: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
-  Trash: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+  Trash: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+  Search: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+  MapPin: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  Briefcase: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
 };
 
 // --- API & Types ---
@@ -764,21 +767,67 @@ const AcademicTemplate = ({ data }: { data: ResumeData }) => (
     </div>
 );
 
-// --- Interview Simulator (with Audio Fix) ---
+// --- Interview Simulator (Enhanced with Job Board) ---
+
+interface JobVacancy {
+    id: string;
+    title: string;
+    company: string;
+    location: string;
+    type: string;
+    description: string;
+    requirements: string[];
+}
 
 const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
-  const [role, setRole] = useState("");
-  const [company, setCompany] = useState("");
-  const [started, setStarted] = useState(false);
+  const [viewMode, setViewMode] = useState<'search' | 'live' | 'report'>('search');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLocation, setSearchLocation] = useState("");
+  const [jobs, setJobs] = useState<JobVacancy[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobVacancy | null>(null);
+
   const [connected, setConnected] = useState(false);
   const [transcript, setTranscript] = useState<string[]>([]);
   const [finalReport, setFinalReport] = useState<any>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const sessionRef = useRef<any>(null);
 
-  const startInterview = async () => {
-    if(!role || !company) return;
-    setStarted(true);
+  const searchJobs = async () => {
+      setLoadingJobs(true);
+      setJobs([]);
+      const client = new GoogleGenAI({ apiKey: API_KEY });
+      
+      const prompt = `Gere uma lista JSON de 4 a 5 vagas de emprego realistas para "${searchQuery}" em "${searchLocation || 'Brasil'}".
+      Formato JSON esperado para cada item:
+      {
+          "id": "unique_id",
+          "title": "Nome do Cargo",
+          "company": "Nome da Empresa (fictícia ou real)",
+          "location": "Cidade, Estado",
+          "type": "Remoto/Híbrido/Presencial",
+          "description": "Resumo atraente da vaga (estilo LinkedIn, max 200 caracteres)",
+          "requirements": ["Requisito 1", "Requisito 2", "Requisito 3"]
+      }`;
+
+      try {
+          const res = await client.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+          });
+          const text = res.text || "[]";
+          const data = JSON.parse(text);
+          setJobs(Array.isArray(data) ? data : []);
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setLoadingJobs(false);
+      }
+  };
+
+  const startInterview = async (job: JobVacancy) => {
+    setSelectedJob(job);
+    setViewMode('live');
 
     const client = new GoogleGenAI({ apiKey: API_KEY });
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -794,9 +843,21 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-        systemInstruction: `Você é um entrevistador profissional da empresa ${company}. Você está entrevistando um candidato para a vaga de ${role}.
-          Seja sério mas educado. Comece se apresentando e pedindo para o candidato se apresentar.
-          Faça perguntas técnicas e comportamentais relevantes. Mantenha o tom profissional de uma entrevista real.`,
+        systemInstruction: `Você é um Recrutador Sênior da empresa ${job.company}. 
+          Você está entrevistando um candidato para a vaga de ${job.title}.
+          
+          DESCRIÇÃO DA VAGA:
+          ${job.description}
+          
+          REQUISITOS:
+          ${job.requirements.join(', ')}
+
+          INSTRUÇÕES:
+          1. Comece se apresentando profissionalmente e agradecendo o candidato pelo interesse na vaga de ${job.title}.
+          2. Peça para o candidato se apresentar.
+          3. Faça perguntas baseadas nos requisitos da vaga listados acima.
+          4. Mantenha um tom profissional, mas acolhedor.
+          5. Avalie as respostas e faça follow-up questions.`,
         inputAudioTranscription: { model: 'gemini-2.5-flash-native-audio-preview-09-2025' }
       },
       callbacks: {
@@ -863,10 +924,10 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
 
              // Transcription accumulation for report
              if (msg.serverContent?.inputTranscription) {
-                 setTranscript(p => [...p, `You: ${msg.serverContent?.inputTranscription?.text}`]);
+                 setTranscript(p => [...p, `Candidato: ${msg.serverContent?.inputTranscription?.text}`]);
              }
              if (msg.serverContent?.outputTranscription) {
-                 setTranscript(p => [...p, `Interviewer: ${msg.serverContent?.outputTranscription?.text}`]);
+                 setTranscript(p => [...p, `Recrutador: ${msg.serverContent?.outputTranscription?.text}`]);
              }
         },
         onclose: () => setConnected(false)
@@ -879,11 +940,11 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
       // Clean up
       sessionRef.current?.disconnect(); 
       setConnected(false);
-      setStarted(false);
+      setViewMode('report');
 
       // Generate Report
       const client = new GoogleGenAI({ apiKey: API_KEY });
-      const prompt = `Analise a seguinte transcrição de entrevista de emprego para ${role} na ${company}.
+      const prompt = `Analise a seguinte entrevista para a vaga de ${selectedJob?.title} na ${selectedJob?.company}.
       
       Transcrição:
       ${transcript.join('\n')}
@@ -901,7 +962,6 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
             contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
-        // FIX: Access .text directly
         const reportText = res.text || "{}";
         setFinalReport(JSON.parse(reportText));
       } catch (e) {
@@ -909,10 +969,12 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
       }
   };
 
-  if (finalReport) {
+  // --- Views ---
+
+  if (viewMode === 'report' && finalReport) {
       return (
           <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-10">
-              <button onClick={onBack} className="mb-4 text-gray-500 hover:text-primary-600">Voltar</button>
+              <button onClick={() => { setViewMode('search'); setFinalReport(null); setTranscript([]); }} className="mb-4 text-gray-500 hover:text-primary-600">Voltar para Vagas</button>
               <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Relatório de Performance</h2>
               <div className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
                   <div className="flex items-center justify-between mb-6">
@@ -934,35 +996,105 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
       )
   }
 
-  return (
-    <div className="max-w-xl mx-auto flex flex-col items-center justify-center h-full space-y-8">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">Simulador de Entrevista</h2>
-        <p className="text-gray-500">Pratique com voz em tempo real.</p>
-      </div>
+  if (viewMode === 'live') {
+      return (
+        <div className="flex flex-col items-center justify-center h-full space-y-8 animate-fade-in">
+           <div className="text-center space-y-2">
+               <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{selectedJob?.title}</h3>
+               <p className="text-gray-500">{selectedJob?.company} • {selectedJob?.location}</p>
+           </div>
+           
+           <div className={`w-40 h-40 rounded-full flex items-center justify-center transition-all duration-1000 ${connected ? 'bg-green-100 dark:bg-green-900/30 shadow-[0_0_50px_rgba(34,197,94,0.3)]' : 'bg-gray-100 dark:bg-dark-700'}`}>
+                {connected ? (
+                    <div className="w-24 h-24 bg-green-500 rounded-full animate-ping opacity-75" />
+                ) : (
+                    <div className="w-24 h-24 bg-gray-400 rounded-full flex items-center justify-center text-white">
+                        <Icons.Microphone />
+                    </div>
+                )}
+           </div>
+           
+           <div className="text-center max-w-md">
+               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{connected ? "Entrevista em andamento" : "Conectando..."}</h3>
+               <p className="text-sm text-gray-500">O recrutador irá avaliar suas respostas em tempo real. Fale com clareza.</p>
+           </div>
 
-      {!started ? (
-        <div className="w-full space-y-4 bg-white dark:bg-dark-800 p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
-          <Input label="Cargo Pretendido" value={role} onChange={(e) => setRole(e.target.value)} />
-          <Input label="Empresa Alvo" value={company} onChange={(e) => setCompany(e.target.value)} />
-          <button onClick={startInterview} disabled={!role || !company} className="w-full bg-primary-600 text-white py-3 rounded-xl font-bold hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-md">
-             Iniciar Entrevista
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center space-y-6 animate-fade-in">
-           <div className={`w-32 h-32 rounded-full flex items-center justify-center transition-all ${connected ? 'bg-green-100 dark:bg-green-900/30 animate-pulse' : 'bg-gray-200 dark:bg-dark-700'}`}>
-                {connected ? <div className="w-20 h-20 bg-green-500 rounded-full animate-ping" /> : <div className="w-20 h-20 bg-gray-400 rounded-full" />}
-           </div>
-           <div className="text-center">
-               <h3 className="text-xl font-bold text-slate-900 dark:text-white">{connected ? "Entrevista em andamento..." : "Conectando..."}</h3>
-               <p className="text-sm text-gray-500">Fale naturalmente com o entrevistador.</p>
-           </div>
-           <button onClick={endSession} className="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-full font-bold shadow-lg transition-colors">
+           <button onClick={endSession} className="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform hover:scale-105">
                <Icons.Stop /> <span>Encerrar Entrevista</span>
            </button>
         </div>
-      )}
+      );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto h-full flex flex-col space-y-6">
+      <div className="flex items-center justify-between">
+         <div className="flex items-center space-x-2">
+            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Buscar Vagas</h2>
+         </div>
+      </div>
+
+      <div className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+              <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400"><Icons.Search /></div>
+                  <input type="text" placeholder="Cargo, habilidade ou empresa (ex: Desenvolvedor React)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
+              </div>
+              <div className="relative">
+                  <div className="absolute left-3 top-3 text-gray-400"><Icons.MapPin /></div>
+                  <input type="text" placeholder="Localização (ex: São Paulo, Remoto)" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)} className="w-full pl-10 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
+              </div>
+          </div>
+          <button onClick={searchJobs} disabled={!searchQuery || loadingJobs} className="w-full bg-primary-600 text-white py-3 rounded-lg font-bold hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-md flex justify-center items-center">
+             {loadingJobs ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : "Buscar Oportunidades"}
+          </button>
+      </div>
+
+      <div className="flex-grow overflow-y-auto space-y-4 pb-10">
+          {jobs.length > 0 ? (
+              jobs.map((job) => (
+                  <div key={job.id} className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4">
+                       <div className="w-16 h-16 bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center text-2xl font-bold text-gray-400">
+                           {job.company.charAt(0)}
+                       </div>
+                       <div className="flex-grow space-y-2">
+                           <div className="flex justify-between items-start">
+                               <div>
+                                   <h3 className="text-xl font-bold text-primary-600 dark:text-primary-400">{job.title}</h3>
+                                   <p className="font-semibold text-slate-800 dark:text-white">{job.company}</p>
+                                   <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                       <span className="flex items-center space-x-1"><Icons.MapPin /> <span>{job.location}</span></span>
+                                       <span className="flex items-center space-x-1"><Icons.Briefcase /> <span>{job.type}</span></span>
+                                   </div>
+                               </div>
+                               <button onClick={() => startInterview(job)} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">
+                                   Simular Entrevista
+                               </button>
+                           </div>
+                           <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed border-l-4 border-gray-200 dark:border-gray-700 pl-3">
+                               {job.description}
+                           </p>
+                           <div className="flex flex-wrap gap-2 pt-2">
+                               {job.requirements.map((req, i) => (
+                                   <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-300 text-xs rounded-full border border-gray-200 dark:border-gray-600">{req}</span>
+                               ))}
+                           </div>
+                       </div>
+                  </div>
+              ))
+          ) : (
+              !loadingJobs && (
+                <div className="text-center py-20 opacity-50">
+                    <div className="mx-auto w-16 h-16 bg-gray-200 dark:bg-dark-700 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                        <Icons.Search />
+                    </div>
+                    <p className="text-xl font-medium">Busque por um cargo para ver as vagas</p>
+                    <p className="text-sm">Nossa IA irá gerar simulações baseadas no mercado atual.</p>
+                </div>
+              )
+          )}
+      </div>
     </div>
   );
 };
