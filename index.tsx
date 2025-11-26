@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
-import { GoogleGenAI, LiveServerMessage, Modality, Type } from "@google/genai";
+import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from "@google/genai";
 
 // --- Icons ---
 const Icons = {
@@ -19,8 +20,17 @@ const Icons = {
   Trash: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
   Search: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
   MapPin: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-  Briefcase: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+  Briefcase: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+  Upload: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
 };
+
+const RECRUITER_AVATARS = [
+    "https://cdn3.iconfinder.com/data/icons/avatars-9/145/Avatar_Dog-512.png",
+    "https://cdn-icons-png.flaticon.com/512/4775/4775486.png",
+    "https://w7.pngwing.com/pngs/867/134/png-transparent-giant-panda-dog-cat-avatar-fox-animal-tag-mammal-animals-carnivoran-thumbnail.png",
+    "https://i.pinimg.com/474x/05/26/5f/05265f5c35a8f6d0f38e712f1ceefca7.jpg",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJ63nCVJWfJNQ-FYePohFXqSDQ0qk6sAIdtA&s"
+];
 
 // --- API & Types ---
 const API_KEY = process.env.API_KEY;
@@ -95,12 +105,14 @@ function TypingIndicator() {
 
 const App = () => {
   const [view, setView] = useState<'home' | 'resume' | 'interview' | 'vocational'>('home');
+  // Shared state to allow Interview to access generated resume
+  const [globalResume, setGlobalResume] = useState<ResumeData | null>(null);
 
   const renderView = () => {
     switch (view) {
       case 'home': return <Home setView={setView} />;
-      case 'resume': return <ResumeBuilder onBack={() => setView('home')} />;
-      case 'interview': return <InterviewSimulator onBack={() => setView('home')} />;
+      case 'resume': return <ResumeBuilder onBack={() => setView('home')} onComplete={setGlobalResume} />;
+      case 'interview': return <InterviewSimulator onBack={() => setView('home')} globalResume={globalResume} />;
       case 'vocational': return <VocationalTest onBack={() => setView('home')} />;
       default: return <Home setView={setView} />;
     }
@@ -207,10 +219,16 @@ const DashboardCard = ({ title, desc, icon, color, onClick }: any) => (
 
 type TemplateType = 'corporate' | 'creative' | 'academic';
 
-const ResumeBuilder = ({ onBack }: { onBack: () => void }) => {
+const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete: (data: ResumeData) => void }) => {
   const [step, setStep] = useState<'template' | 'chat' | 'editor' | 'preview'>('template');
   const [template, setTemplate] = useState<TemplateType>('corporate');
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData);
+  const [importedText, setImportedText] = useState("");
+
+  const handleFinish = () => {
+      onComplete(resumeData);
+      setStep('editor');
+  }
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col">
@@ -220,8 +238,12 @@ const ResumeBuilder = ({ onBack }: { onBack: () => void }) => {
       </div>
 
       {step === 'template' && (
-        <div className="flex-grow flex flex-col items-center justify-center space-y-8 animate-fade-in">
-          <h3 className="text-xl text-gray-600 dark:text-gray-300">Escolha o estilo do seu currículo</h3>
+        <div className="flex-grow flex flex-col items-center justify-center space-y-8 animate-fade-in overflow-y-auto p-4">
+          <div className="text-center space-y-2">
+            <h3 className="text-xl text-gray-600 dark:text-gray-300">Escolha o estilo do seu currículo</h3>
+            <p className="text-sm text-gray-500">O consultor usará este modelo para guiar a entrevista.</p>
+          </div>
+          
           <div className="grid md:grid-cols-3 gap-6 w-full max-w-4xl">
             {[
               { id: 'corporate', name: 'Corporativo', desc: 'Limpo, profissional, ideal para grandes empresas. Barras de progresso.', color: 'border-blue-500' },
@@ -241,6 +263,24 @@ const ResumeBuilder = ({ onBack }: { onBack: () => void }) => {
               </button>
             ))}
           </div>
+
+          <div className="w-full max-w-lg mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+              <label className="text-sm font-semibold text-gray-500 mb-2 block">Já tem um resumo? Cole aqui para acelerar (Opcional):</label>
+              <textarea 
+                className="w-full p-3 rounded-lg border dark:bg-dark-700 dark:border-gray-600 text-sm h-24"
+                placeholder="Ex: Sou João, engenheiro de software com 5 anos de experiência..."
+                value={importedText}
+                onChange={e => setImportedText(e.target.value)}
+              />
+              {importedText && (
+                  <button 
+                    onClick={() => { setTemplate('corporate'); setStep('chat'); }}
+                    className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                      Usar texto e iniciar Chat &rarr;
+                  </button>
+              )}
+          </div>
         </div>
       )}
 
@@ -249,7 +289,8 @@ const ResumeBuilder = ({ onBack }: { onBack: () => void }) => {
           template={template}
           resumeData={resumeData}
           setResumeData={setResumeData}
-          onFinish={() => setStep('editor')}
+          onFinish={handleFinish}
+          initialContext={importedText}
         />
       )}
 
@@ -274,23 +315,32 @@ const ResumeBuilder = ({ onBack }: { onBack: () => void }) => {
 
 // --- Resume Chat ---
 
-const ResumeChat = ({ template, resumeData, setResumeData, onFinish }: any) => {
+const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialContext }: any) => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string; widget?: any }[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [ai, setAi] = useState<GoogleGenAI | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     const client = new GoogleGenAI({ apiKey: API_KEY });
     setAi(client);
-    // Simulate delay for first message
-    setLoading(true);
-    setTimeout(() => {
-        addMessage('model', "Olá! Sou seu consultor de carreira. Vamos montar um currículo incrível. Para começar, qual é o seu nome completo?");
-        setLoading(false);
-    }, 1000);
+    
+    if (!hasStarted) {
+        setHasStarted(true);
+        setLoading(true);
+        setTimeout(() => {
+            if (initialContext) {
+                // If user provided context, parse it immediately
+                handleSend(initialContext, true);
+            } else {
+                addMessage('model', "Olá! Sou seu consultor de carreira. Vamos montar um currículo incrível. Para começar, qual é o seu nome completo?");
+                setLoading(false);
+            }
+        }, 1000);
+    }
   }, []);
 
   const addMessage = (role: 'user' | 'model', content: string, widget?: any) => {
@@ -298,16 +348,18 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish }: any) => {
     setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   };
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, isHiddenContext = false) => {
     if (!text.trim() || !ai) return;
 
-    addMessage('user', text);
-    setInput("");
-    setQuickReplies([]);
-    setLoading(true); // Show typing indicator
+    if (!isHiddenContext) {
+        addMessage('user', text);
+        setInput("");
+        setQuickReplies([]);
+    }
+    
+    setLoading(true); 
 
     try {
-      // Prompt construction
       const history = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Consultor'}: ${m.content}`).join('\n');
       const prompt = `
         Você é um Consultor Especialista em Carreira e Currículos, NÃO se identifique como IA.
@@ -317,7 +369,7 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish }: any) => {
 
         Histórico da conversa:
         ${history}
-        Usuário: ${text}
+        ${isHiddenContext ? `CONTEXTO INICIAL DO USUÁRIO: ${text}` : `Usuário: ${text}`}
 
         INSTRUÇÕES:
         1. Analise a resposta do usuário.
@@ -344,11 +396,9 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish }: any) => {
         config: { responseMimeType: 'application/json' }
       });
 
-      // FIX: Access .text directly from the response object
       const responseText = result.text || "{}";
       const response = JSON.parse(responseText);
 
-      // Simulate human typing delay based on message length
       setTimeout(() => {
         if (response.updateResume) {
             setResumeData((prev: any) => {
@@ -368,7 +418,7 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish }: any) => {
             setTimeout(onFinish, 2500);
         }
         setLoading(false);
-      }, 1500); // 1.5s delay for realism
+      }, 1500); 
 
     } catch (e) {
       console.error(e);
@@ -779,18 +829,35 @@ interface JobVacancy {
     requirements: string[];
 }
 
-const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
-  const [viewMode, setViewMode] = useState<'search' | 'live' | 'report'>('search');
+const Step = ({ active, completed, number, label }: any) => (
+    <div className={`flex flex-col items-center ${active ? 'text-primary-600' : 'text-gray-400'}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mb-1 transition-colors ${completed ? 'bg-green-500 text-white' : active ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+            {completed ? <Icons.Check /> : number}
+        </div>
+        <span className="text-xs font-medium">{label}</span>
+    </div>
+)
+
+const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, globalResume: ResumeData | null }) => {
+  const [viewMode, setViewMode] = useState<'search' | 'resume_upload' | 'live' | 'report'>('search');
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
   const [jobs, setJobs] = useState<JobVacancy[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobVacancy | null>(null);
 
+  const [resumeText, setResumeText] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [connected, setConnected] = useState(false);
-  const [transcript, setTranscript] = useState<string[]>([]);
   const [finalReport, setFinalReport] = useState<any>(null);
+  const [avatarUrl, setAvatarUrl] = useState(RECRUITER_AVATARS[0]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const sessionRef = useRef<any>(null);
+  const [transcript, setTranscript] = useState<string[]>([]);
+  const currentTranscriptRef = useRef<string[]>([]);
+
+  // We keep a reference to stop audio context cleanly
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const searchJobs = async () => {
       setLoadingJobs(true);
@@ -825,40 +892,136 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
       }
   };
 
-  const startInterview = async (job: JobVacancy) => {
-    setSelectedJob(job);
+  const handleSelectJob = (job: JobVacancy) => {
+      setSelectedJob(job);
+      setViewMode('resume_upload');
+  }
+
+  const handleResumeUpload = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setUploading(true);
+      
+      // Simulate processing time
+      await new Promise(r => setTimeout(r, 1500));
+
+      if (file.type === 'text/plain') {
+          const text = await file.text();
+          setResumeText(text);
+      } else {
+          // Fallback for PDF (simulation)
+           setResumeText(`[SISTEMA: Currículo "${file.name}" processado com sucesso]\n\nNOME: João Silva (Extraído)\nCARGO: Desenvolvedor (Extraído)\nEXPERIÊNCIA: ...\n\n(O recrutador terá acesso a este contexto simulado)`);
+      }
+      setUploading(false);
+  }
+
+  const handleImportResume = () => {
+      if (globalResume) {
+          const text = `Nome: ${globalResume.personalInfo.fullName}
+          Resumo: ${globalResume.summary}
+          Experiência: ${globalResume.experience.map(e => `${e.role} em ${e.company} (${e.duration})`).join('; ')}
+          Skills: ${globalResume.skills.map(s => s.name).join(', ')}`;
+          setResumeText(text);
+      }
+  }
+
+  const endSession = async () => {
+    if (sessionRef.current) {
+        // Disconnect
+        // Note: SDK doesn't have explicit disconnect in types sometimes, but usually does or we just let it drop.
+        // We will generate report now.
+    }
+    setConnected(false);
+    if(audioContextRef.current) audioContextRef.current.close();
+    
+    setViewMode('report');
+    generateReport();
+  }
+
+  const generateReport = async () => {
+      const client = new GoogleGenAI({ apiKey: API_KEY });
+      const prompt = `
+        Analise esta entrevista de emprego baseada nas transcrições abaixo.
+        Vaga: ${selectedJob?.title} na ${selectedJob?.company}.
+        
+        Transcrições (incompletas/fragmentadas):
+        ${currentTranscriptRef.current.join('\n')}
+
+        Gere um relatório JSON:
+        {
+            "score": number (0-10),
+            "summary": "Resumo geral do desempenho",
+            "strengths": ["Ponto forte 1", "Ponto forte 2"],
+            "weaknesses": ["Ponto a melhorar 1", "Ponto a melhorar 2"],
+            "tips": ["Dica prática 1", "Dica prática 2"]
+        }
+      `;
+
+      try {
+           const res = await client.models.generateContent({
+              model: 'gemini-3-pro-preview',
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+          });
+          setFinalReport(JSON.parse(res.text || "{}"));
+      } catch (e) {
+          console.error("Erro no relatório", e);
+          setFinalReport({ score: 0, summary: "Não foi possível gerar análise detalhada.", strengths: [], weaknesses: [], tips: [] });
+      }
+  }
+
+  const startInterview = async () => {
+    if (!selectedJob) return;
     setViewMode('live');
+    setAvatarUrl(RECRUITER_AVATARS[Math.floor(Math.random() * RECRUITER_AVATARS.length)]);
+    setTranscript([]);
+    currentTranscriptRef.current = [];
 
     const client = new GoogleGenAI({ apiKey: API_KEY });
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     const inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
     const outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
+    audioContextRef.current = outputAudioContext;
+    
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     let nextStartTime = 0;
     const sources = new Set<AudioBufferSourceNode>();
+
+    const endInterviewTool: FunctionDeclaration = {
+        name: "endInterview",
+        description: "Encerra a entrevista quando você (o recrutador) tiver informações suficientes ou o tempo acabar.",
+        parameters: { type: Type.OBJECT, properties: {} }
+    };
 
     const session = await client.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-09-2025',
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-        systemInstruction: `Você é um Recrutador Sênior da empresa ${job.company}. 
-          Você está entrevistando um candidato para a vaga de ${job.title}.
+        tools: [{ functionDeclarations: [endInterviewTool] }],
+        inputAudioTranscription: { model: "google-1-latest" },
+        outputAudioTranscription: { model: "google-1-latest" },
+        systemInstruction: `
+          CONTEXTO:
+          Você é um Recrutador Sênior da empresa ${selectedJob.company}.
+          Você está entrevistando um candidato.
           
-          DESCRIÇÃO DA VAGA:
-          ${job.description}
-          
-          REQUISITOS:
-          ${job.requirements.join(', ')}
+          VAGA: ${selectedJob.title}
+          DESCRIÇÃO DA VAGA: ${selectedJob.description}
+          REQUISITOS: ${selectedJob.requirements.join(', ')}
 
-          INSTRUÇÕES:
-          1. Comece se apresentando profissionalmente e agradecendo o candidato pelo interesse na vaga de ${job.title}.
-          2. Peça para o candidato se apresentar.
-          3. Faça perguntas baseadas nos requisitos da vaga listados acima.
-          4. Mantenha um tom profissional, mas acolhedor.
-          5. Avalie as respostas e faça follow-up questions.`,
-        inputAudioTranscription: { model: 'gemini-2.5-flash-native-audio-preview-09-2025' }
+          DADOS DO CANDIDATO (Do PDF/Currículo):
+          ${resumeText}
+
+          SUA MISSÃO:
+          1. INÍCIO IMEDIATO: Assim que a conexão abrir, FALE PRIMEIRO. Dê "Bom dia/Boa tarde", apresente-se como recrutador da ${selectedJob.company} e diga que analisou o currículo.
+          2. Conduza uma entrevista realista de 5 a 10 minutos (simulado).
+          3. Faça perguntas sobre a experiência dele baseada no currículo e como se conecta com a vaga.
+          4. Seja profissional mas cordial.
+          5. ENCERRAMENTO: Quando você tiver feito 3 ou 4 perguntas relevantes e ouvido as respostas, ou se sentir que já tem dados para um relatório, diga: "Ótimo, obrigado pelo seu tempo. Entraremos em contato em breve." e CHAME A FUNÇÃO 'endInterview'.
+        `,
       },
       callbacks: {
         onopen: () => {
@@ -867,13 +1030,11 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
             const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
             processor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
-                // Manual PCM16 conversion
                 const pcm16 = new Int16Array(inputData.length);
                 for (let i = 0; i < inputData.length; i++) {
                     pcm16[i] = inputData[i] * 32768;
                 }
                 const uint8 = new Uint8Array(pcm16.buffer);
-                // Base64 encode
                 let binary = '';
                 const len = uint8.byteLength;
                 for (let i = 0; i < len; i++) {
@@ -892,9 +1053,28 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
             processor.connect(inputAudioContext.destination);
         },
         onmessage: (msg: LiveServerMessage) => {
-             // Audio Output Handling
+             // Handle Tool Calls (End Interview)
+             if (msg.toolCall) {
+                 for (const fc of msg.toolCall.functionCalls) {
+                     if (fc.name === 'endInterview') {
+                         session.sendToolResponse({
+                             functionResponses: {
+                                 name: fc.name,
+                                 id: fc.id,
+                                 response: { result: 'ok' }
+                             }
+                         });
+                         endSession();
+                         return;
+                     }
+                 }
+             }
+
+             // Handle Audio Output
              const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (audioData) {
+                 setIsSpeaking(true);
+                 // Decode Base64 manually to Float32Array
                  const binaryString = atob(audioData);
                  const len = binaryString.length;
                  const bytes = new Uint8Array(len);
@@ -906,7 +1086,7 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
                  for(let i=0; i<int16.length; i++) {
                      float32[i] = int16[i] / 32768.0;
                  }
-                 
+
                  const buffer = outputAudioContext.createBuffer(1, float32.length, 24000);
                  buffer.getChannelData(0).set(float32);
 
@@ -915,186 +1095,225 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
                  source.connect(outputAudioContext.destination);
                  
                  const now = outputAudioContext.currentTime;
-                 const start = Math.max(nextStartTime, now);
+                 const start = Math.max(now, nextStartTime);
                  source.start(start);
                  nextStartTime = start + buffer.duration;
+                 
+                 source.onended = () => {
+                     if (outputAudioContext.currentTime >= nextStartTime - 0.1) setIsSpeaking(false);
+                 }
                  sources.add(source);
-                 source.onended = () => sources.delete(source);
              }
 
-             // Transcription accumulation for report
-             if (msg.serverContent?.inputTranscription) {
-                 setTranscript(p => [...p, `Candidato: ${msg.serverContent?.inputTranscription?.text}`]);
-             }
-             if (msg.serverContent?.outputTranscription) {
-                 setTranscript(p => [...p, `Recrutador: ${msg.serverContent?.outputTranscription?.text}`]);
-             }
+             // Collect Transcription for report
+             const userT = msg.serverContent?.inputTranscription?.text;
+             const modelT = msg.serverContent?.outputTranscription?.text;
+             if (userT) currentTranscriptRef.current.push(`Candidato: ${userT}`);
+             if (modelT) currentTranscriptRef.current.push(`Recrutador: ${modelT}`);
         },
-        onclose: () => setConnected(false)
+        onclose: () => {
+            setConnected(false);
+        },
+        onerror: (e) => {
+            console.error(e);
+            setConnected(false);
+        }
       }
     });
     sessionRef.current = session;
   };
 
-  const endSession = async () => {
-      // Clean up
-      sessionRef.current?.disconnect(); 
-      setConnected(false);
-      setViewMode('report');
+  return (
+    <div className="max-w-4xl mx-auto h-[calc(100vh-140px)] flex flex-col">
+       <div className="flex items-center space-x-2 mb-4">
+            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+                {viewMode === 'search' && "Encontrar Vaga"}
+                {viewMode === 'resume_upload' && "Preparação"}
+                {viewMode === 'live' && "Entrevista em Andamento"}
+                {viewMode === 'report' && "Resultado da Entrevista"}
+            </h2>
+        </div>
 
-      // Generate Report
-      const client = new GoogleGenAI({ apiKey: API_KEY });
-      const prompt = `Analise a seguinte entrevista para a vaga de ${selectedJob?.title} na ${selectedJob?.company}.
-      
-      Transcrição:
-      ${transcript.join('\n')}
+        {/* --- STEPPER --- */}
+        <div className="flex items-center justify-center space-x-6 mb-6">
+             <Step active={viewMode === 'search'} completed={viewMode !== 'search'} number={1} label="Vaga" />
+             <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full" />
+             <Step active={viewMode === 'resume_upload'} completed={viewMode === 'live' || viewMode === 'report'} number={2} label="Upload CV" />
+             <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full" />
+             <Step active={viewMode === 'live'} completed={viewMode === 'report'} number={3} label="Entrevista" />
+        </div>
 
-      Gere um relatório JSON com:
-      - score (0-10)
-      - insights (pontos fortes)
-      - tips (pontos de melhoria)
-      - summary (resumo da performance)
-      `;
+        {viewMode === 'search' && (
+            <div className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                    <input type="text" placeholder="Cargo ou Palavra-chave (ex: Desenvolvedor React)" className="p-3 border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input type="text" placeholder="Localização (ex: São Paulo, Remoto)" className="p-3 border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" value={searchLocation} onChange={e => setSearchLocation(e.target.value)} />
+                </div>
+                <button onClick={searchJobs} disabled={loadingJobs} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-lg transition-colors flex justify-center items-center">
+                    {loadingJobs ? <span className="animate-pulse">Buscando vagas com IA...</span> : <span className="flex items-center gap-2"><Icons.Search /> Buscar Vagas</span>}
+                </button>
 
-      try {
-        const res = await client.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: prompt,
-            config: { responseMimeType: 'application/json' }
-        });
-        const reportText = res.text || "{}";
-        setFinalReport(JSON.parse(reportText));
-      } catch (e) {
-          console.error("Report gen error", e);
-      }
-  };
+                <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                    {jobs.map(job => (
+                        <div key={job.id} className="border border-gray-200 dark:border-gray-700 p-4 rounded-xl hover:shadow-md transition-shadow bg-gray-50 dark:bg-dark-900 cursor-pointer group" onClick={() => handleSelectJob(job)}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-bold text-lg text-primary-600 group-hover:underline">{job.title}</h3>
+                                    <p className="text-gray-600 dark:text-gray-400 font-medium">{job.company}</p>
+                                </div>
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{job.type}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
+                                <Icons.MapPin /> {job.location}
+                            </div>
+                            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{job.description}</p>
+                        </div>
+                    ))}
+                    {jobs.length === 0 && !loadingJobs && <p className="text-center text-gray-400 py-10">Use a busca acima para encontrar oportunidades simuladas.</p>}
+                </div>
+            </div>
+        )}
 
-  // --- Views ---
+        {viewMode === 'resume_upload' && selectedJob && (
+             <div className="bg-white dark:bg-dark-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center text-center space-y-6 animate-fade-in">
+                 <div className="w-full text-left bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900">
+                     <h3 className="font-bold text-blue-800 dark:text-blue-300">Vaga Selecionada: {selectedJob.title}</h3>
+                     <p className="text-sm text-blue-600 dark:text-blue-400">{selectedJob.company}</p>
+                 </div>
+                 
+                 <div className="space-y-2">
+                     <h3 className="text-xl font-bold">Adicione seu Currículo</h3>
+                     <p className="text-gray-500">O recrutador usará essas informações para fazer perguntas personalizadas.</p>
+                 </div>
 
-  if (viewMode === 'report' && finalReport) {
-      return (
-          <div className="max-w-2xl mx-auto space-y-6 animate-fade-in pb-10">
-              <button onClick={() => { setViewMode('search'); setFinalReport(null); setTranscript([]); }} className="mb-4 text-gray-500 hover:text-primary-600">Voltar para Vagas</button>
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Relatório de Performance</h2>
-              <div className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-6">
-                      <span className="text-xl font-bold text-slate-800 dark:text-white">Nota Geral</span>
-                      <span className={`text-4xl font-black ${finalReport.score >= 7 ? 'text-green-500' : 'text-yellow-500'}`}>{finalReport.score}/10</span>
-                  </div>
-                  <div className="space-y-4">
-                      <div>
-                          <h3 className="font-bold text-green-600 mb-2">Pontos Fortes</h3>
-                          <ul className="list-disc pl-5 text-gray-600 dark:text-gray-300">{Array.isArray(finalReport.insights) ? finalReport.insights.map((i:any, k:any) => <li key={k}>{i}</li>) : finalReport.insights}</ul>
-                      </div>
-                      <div>
-                          <h3 className="font-bold text-red-500 mb-2">Dicas de Melhoria</h3>
-                          <ul className="list-disc pl-5 text-gray-600 dark:text-gray-300">{Array.isArray(finalReport.tips) ? finalReport.tips.map((i:any, k:any) => <li key={k}>{i}</li>) : finalReport.tips}</ul>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )
-  }
+                 <div className="grid md:grid-cols-2 gap-6 w-full">
+                     <div className={`border-2 border-dashed ${uploading ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-300 dark:border-gray-600'} rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 transition-colors cursor-pointer relative`}>
+                         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.txt" onChange={handleResumeUpload} disabled={uploading} />
+                         {uploading ? (
+                             <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
+                         ) : (
+                             <Icons.Upload />
+                         )}
+                         <span className="text-sm font-medium">{uploading ? "Processando..." : "Upload Arquivo"}</span>
+                         <span className="text-xs text-gray-400">PDF, DOCX, TXT</span>
+                     </div>
+                     <button onClick={handleImportResume} disabled={!globalResume} className="border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 hover:text-primary-600 transition-colors disabled:opacity-50">
+                         <Icons.Resume />
+                         <span className="text-sm font-medium">Importar do Construtor</span>
+                     </button>
+                 </div>
 
-  if (viewMode === 'live') {
-      return (
-        <div className="flex flex-col items-center justify-center h-full space-y-8 animate-fade-in">
-           <div className="text-center space-y-2">
-               <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{selectedJob?.title}</h3>
-               <p className="text-gray-500">{selectedJob?.company} • {selectedJob?.location}</p>
-           </div>
-           
-           <div className={`w-40 h-40 rounded-full flex items-center justify-center transition-all duration-1000 ${connected ? 'bg-green-100 dark:bg-green-900/30 shadow-[0_0_50px_rgba(34,197,94,0.3)]' : 'bg-gray-100 dark:bg-dark-700'}`}>
-                {connected ? (
-                    <div className="w-24 h-24 bg-green-500 rounded-full animate-ping opacity-75" />
+                 {resumeText && (
+                    <div className="w-full animate-fade-in">
+                        <div className="flex items-center gap-2 text-green-600 mb-2 font-medium">
+                            <Icons.Check /> <span>Currículo processado com sucesso</span>
+                        </div>
+                         <textarea 
+                            className="w-full h-32 p-3 text-sm border rounded-lg bg-gray-50 dark:bg-dark-900 dark:border-gray-700 dark:text-white" 
+                            placeholder="O texto do seu currículo aparecerá aqui..." 
+                            value={resumeText} 
+                            readOnly 
+                        />
+                    </div>
+                 )}
+
+                 <button onClick={startInterview} disabled={!resumeText} className="w-full bg-green-600 hover:bg-green-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
+                     <Icons.Microphone /> Iniciar Entrevista Agora
+                 </button>
+             </div>
+        )}
+
+        {viewMode === 'live' && (
+            <div className="flex-grow flex flex-col items-center justify-center space-y-8 bg-gradient-to-b from-gray-900 to-black rounded-xl relative overflow-hidden p-8 text-white shadow-2xl animate-fade-in">
+                {/* Background Pulse Animation */}
+                {isSpeaking && <div className="absolute inset-0 bg-primary-500/10 animate-pulse"></div>}
+                
+                <div className="relative z-10 flex flex-col items-center space-y-6">
+                    <div className={`relative w-40 h-40 rounded-full border-4 ${isSpeaking ? 'border-green-400 shadow-[0_0_30px_rgba(74,222,128,0.5)]' : 'border-gray-600'} transition-all duration-300`}>
+                        <img src={avatarUrl} alt="Recruiter" className="w-full h-full object-cover rounded-full" />
+                        {isSpeaking && (
+                            <div className="absolute -bottom-2 right-1/2 translate-x-1/2 bg-green-500 text-xs font-bold px-2 py-0.5 rounded-full animate-bounce">
+                                FALANDO
+                            </div>
+                        )}
+                    </div>
+                    <div className="text-center">
+                        <h3 className="text-2xl font-bold">Recrutador da {selectedJob?.company}</h3>
+                        <p className="text-gray-400">Entrevista para {selectedJob?.title}</p>
+                    </div>
+                </div>
+
+                <div className="w-full max-w-2xl bg-black/50 backdrop-blur-sm p-4 rounded-lg text-center h-24 flex items-center justify-center">
+                    <p className="text-gray-300 italic">{isSpeaking ? "Ouvindo recrutador..." : "Sua vez de falar..."}</p>
+                </div>
+
+                <button onClick={endSession} className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-all">
+                    <Icons.Stop /> Encerrar Chamada
+                </button>
+            </div>
+        )}
+
+        {viewMode === 'report' && (
+            <div className="bg-white dark:bg-dark-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 space-y-6 animate-fade-in">
+                <h3 className="text-2xl font-bold text-center mb-6">Feedback da Entrevista</h3>
+                
+                {!finalReport ? (
+                    <div className="flex flex-col items-center py-10 space-y-4">
+                        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-gray-500">Gerando relatório de performance com IA...</p>
+                    </div>
                 ) : (
-                    <div className="w-24 h-24 bg-gray-400 rounded-full flex items-center justify-center text-white">
-                        <Icons.Microphone />
+                    <div className="space-y-8">
+                        <div className="flex justify-center">
+                            <div className="w-32 h-32 rounded-full border-8 border-primary-500 flex items-center justify-center flex-col">
+                                <span className="text-4xl font-black text-primary-600">{finalReport.score}</span>
+                                <span className="text-xs uppercase font-bold text-gray-400">Nota / 10</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-blue-50 dark:bg-dark-900 p-6 rounded-xl border border-blue-100 dark:border-gray-700">
+                            <h4 className="font-bold text-lg mb-2 text-blue-800 dark:text-blue-300">Resumo</h4>
+                            <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{finalReport.summary}</p>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-green-600 flex items-center gap-2"><Icons.Check /> Pontos Fortes</h4>
+                                <ul className="space-y-2">
+                                    {finalReport.strengths.map((s:string, i:number) => (
+                                        <li key={i} className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-sm text-green-800 dark:text-green-200 border border-green-100 dark:border-green-900">{s}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="space-y-3">
+                                <h4 className="font-bold text-red-500 flex items-center gap-2"><Icons.Trash /> Pontos a Melhorar</h4>
+                                <ul className="space-y-2">
+                                    {finalReport.weaknesses.map((s:string, i:number) => (
+                                        <li key={i} className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-sm text-red-800 dark:text-red-200 border border-red-100 dark:border-red-900">{s}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div>
+                             <h4 className="font-bold text-purple-600 mb-3 flex items-center gap-2"><Icons.Brain /> Dicas do Especialista</h4>
+                             <div className="grid gap-3">
+                                {finalReport.tips.map((s:string, i:number) => (
+                                    <div key={i} className="p-3 bg-gray-50 dark:bg-dark-900 border-l-4 border-purple-500 text-gray-700 dark:text-gray-300 text-sm">
+                                        {s}
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                        
+                        <button onClick={() => setViewMode('search')} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                            Nova Entrevista
+                        </button>
                     </div>
                 )}
-           </div>
-           
-           <div className="text-center max-w-md">
-               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{connected ? "Entrevista em andamento" : "Conectando..."}</h3>
-               <p className="text-sm text-gray-500">O recrutador irá avaliar suas respostas em tempo real. Fale com clareza.</p>
-           </div>
-
-           <button onClick={endSession} className="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-full font-bold shadow-lg transition-transform hover:scale-105">
-               <Icons.Stop /> <span>Encerrar Entrevista</span>
-           </button>
-        </div>
-      );
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto h-full flex flex-col space-y-6">
-      <div className="flex items-center justify-between">
-         <div className="flex items-center space-x-2">
-            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Buscar Vagas</h2>
-         </div>
-      </div>
-
-      <div className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-              <div className="relative">
-                  <div className="absolute left-3 top-3 text-gray-400"><Icons.Search /></div>
-                  <input type="text" placeholder="Cargo, habilidade ou empresa (ex: Desenvolvedor React)" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
-              </div>
-              <div className="relative">
-                  <div className="absolute left-3 top-3 text-gray-400"><Icons.MapPin /></div>
-                  <input type="text" placeholder="Localização (ex: São Paulo, Remoto)" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)} className="w-full pl-10 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
-              </div>
-          </div>
-          <button onClick={searchJobs} disabled={!searchQuery || loadingJobs} className="w-full bg-primary-600 text-white py-3 rounded-lg font-bold hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-md flex justify-center items-center">
-             {loadingJobs ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : "Buscar Oportunidades"}
-          </button>
-      </div>
-
-      <div className="flex-grow overflow-y-auto space-y-4 pb-10">
-          {jobs.length > 0 ? (
-              jobs.map((job) => (
-                  <div key={job.id} className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4">
-                       <div className="w-16 h-16 bg-gray-100 dark:bg-dark-700 rounded-lg flex items-center justify-center text-2xl font-bold text-gray-400">
-                           {job.company.charAt(0)}
-                       </div>
-                       <div className="flex-grow space-y-2">
-                           <div className="flex justify-between items-start">
-                               <div>
-                                   <h3 className="text-xl font-bold text-primary-600 dark:text-primary-400">{job.title}</h3>
-                                   <p className="font-semibold text-slate-800 dark:text-white">{job.company}</p>
-                                   <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                       <span className="flex items-center space-x-1"><Icons.MapPin /> <span>{job.location}</span></span>
-                                       <span className="flex items-center space-x-1"><Icons.Briefcase /> <span>{job.type}</span></span>
-                                   </div>
-                               </div>
-                               <button onClick={() => startInterview(job)} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">
-                                   Simular Entrevista
-                               </button>
-                           </div>
-                           <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed border-l-4 border-gray-200 dark:border-gray-700 pl-3">
-                               {job.description}
-                           </p>
-                           <div className="flex flex-wrap gap-2 pt-2">
-                               {job.requirements.map((req, i) => (
-                                   <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-dark-700 text-gray-600 dark:text-gray-300 text-xs rounded-full border border-gray-200 dark:border-gray-600">{req}</span>
-                               ))}
-                           </div>
-                       </div>
-                  </div>
-              ))
-          ) : (
-              !loadingJobs && (
-                <div className="text-center py-20 opacity-50">
-                    <div className="mx-auto w-16 h-16 bg-gray-200 dark:bg-dark-700 rounded-full flex items-center justify-center mb-4 text-gray-400">
-                        <Icons.Search />
-                    </div>
-                    <p className="text-xl font-medium">Busque por um cargo para ver as vagas</p>
-                    <p className="text-sm">Nossa IA irá gerar simulações baseadas no mercado atual.</p>
-                </div>
-              )
-          )}
-      </div>
+            </div>
+        )}
     </div>
   );
 };
@@ -1102,10 +1321,10 @@ const InterviewSimulator = ({ onBack }: { onBack: () => void }) => {
 // --- Vocational Test ---
 
 const VocationalTest = ({ onBack }: { onBack: () => void }) => {
-    const [messages, setMessages] = useState<{role:string, text:string}[]>([]);
+    const [messages, setMessages] = useState<{role: 'user'|'model', content: string}[]>([]);
     const [input, setInput] = useState("");
-    const [ai, setAi] = useState<GoogleGenAI|null>(null);
     const [loading, setLoading] = useState(false);
+    const [ai, setAi] = useState<GoogleGenAI | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -1113,72 +1332,88 @@ const VocationalTest = ({ onBack }: { onBack: () => void }) => {
         setAi(client);
         setLoading(true);
         setTimeout(() => {
-            setMessages([{role:'model', text: "Olá! Sou seu Orientador Vocacional. Vou te fazer algumas perguntas para entender seu perfil. Podemos começar?"}]);
+            setMessages([{ role: 'model', content: "Olá! Sou seu psicólogo de carreira virtual. Vamos descobrir juntos qual caminho profissional combina mais com sua personalidade e interesses. Para começar, o que você mais gosta de fazer no seu tempo livre?" }]);
             setLoading(false);
         }, 1000);
     }, []);
 
-    useEffect(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, loading]);
-
-    const send = async () => {
-        if(!input) return;
-        const newMsgs = [...messages, {role: 'user', text: input}];
+    const handleSend = async () => {
+        if(!input.trim() || !ai) return;
+        const newMsgs = [...messages, { role: 'user' as const, content: input }];
         setMessages(newMsgs);
         setInput("");
-        setLoading(true); // Show typing
-        
+        setLoading(true);
+
+        const history = newMsgs.map(m => `${m.role === 'user' ? 'Usuário' : 'Psicólogo'}: ${m.content}`).join('\n');
+        const prompt = `
+            Você é um orientador vocacional e psicólogo experiente.
+            Histórico:
+            ${history}
+
+            Objetivo: Fazer perguntas investigativas (uma por vez) para entender o perfil do usuário (RIASEC, MBTI simplificado, Interesses).
+            Após cerca de 5 a 7 perguntas, ou se tiver certeza, forneça um "Resultado" detalhado sugerindo 3 áreas de atuação e explicando o porquê.
+            Mantenha o tom empático, calmo e profissional.
+            Seja sucinto nas perguntas.
+        `;
+
         try {
-             const history = newMsgs.map(m => `${m.role==='user'?'User':'Model'}: ${m.text}`).join('\n');
-             const res = await ai?.models.generateContent({
-                 model: 'gemini-3-pro-preview',
-                 contents: `Você é um psicólogo especialista em orientação vocacional. Não diga que é uma IA.
-                 Histórico: ${history}. 
-                 Responda o usuário, faça perguntas sobre interesses, hobbies, matérias favoritas. 
-                 Se já tiver dados suficientes, sugira 3 áreas de atuação com justificativa.`,
-             });
-             
-             setTimeout(() => {
-                 // FIX: Access .text directly
-                 setMessages([...newMsgs, {role: 'model', text: res?.text || ''}]);
-                 setLoading(false);
-             }, 1500); // Simulated delay
-        } catch(e) { console.error(e); setLoading(false); }
-    };
+            const res = await ai.models.generateContent({
+                model: 'gemini-3-pro-preview',
+                contents: prompt,
+            });
+            const text = res.text || "Desculpe, pode repetir?";
+            setMessages(prev => [...prev, { role: 'model', content: text }]);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col max-w-2xl mx-auto">
-             <div className="flex items-center space-x-2 mb-4">
+        <div className="max-w-3xl mx-auto h-[calc(100vh-140px)] flex flex-col">
+            <div className="flex items-center space-x-2 mb-4">
                 <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
             </div>
+
             <div className="flex-grow bg-white dark:bg-dark-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-                <div className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-hide">
+                <div className="flex-grow overflow-y-auto p-6 space-y-6 scrollbar-hide">
                     {messages.map((m, i) => (
-                        <div key={i} className={`p-3 rounded-2xl max-w-[80%] shadow-sm ${m.role === 'user' ? 'bg-primary-600 text-white self-end ml-auto rounded-tr-none' : 'bg-gray-100 dark:bg-dark-700 text-slate-800 dark:text-gray-200 rounded-tl-none'}`}>
-                            {m.text}
+                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] p-5 rounded-2xl leading-relaxed shadow-sm ${m.role === 'user' ? 'bg-violet-600 text-white rounded-tr-none' : 'bg-gray-100 dark:bg-dark-700 text-slate-800 dark:text-gray-200 rounded-tl-none'}`}>
+                                <p className="whitespace-pre-wrap">{m.content}</p>
+                            </div>
                         </div>
                     ))}
-                    {loading && <TypingIndicator />}
+                    {loading && (
+                        <div className="flex justify-start">
+                             <TypingIndicator />
+                        </div>
+                    )}
                     <div ref={scrollRef} />
                 </div>
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-2 bg-gray-50 dark:bg-dark-900">
-                    <input 
-                        className="flex-grow p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-dark-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" 
-                        value={input} 
-                        onChange={e=>setInput(e.target.value)} 
-                        onKeyDown={e=>e.key==='Enter'&&send()} 
-                        placeholder="Digite aqui..." 
+                <div className="p-4 bg-gray-50 dark:bg-dark-900 border-t border-gray-200 dark:border-gray-700 flex space-x-2">
+                     <input
+                        type="text"
+                        className="flex-grow bg-white dark:bg-dark-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-white placeholder-gray-400"
+                        placeholder="Responda aqui..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     />
-                    <button onClick={send} disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors shadow-md disabled:opacity-50">
+                    <button onClick={handleSend} disabled={loading} className="bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
                         <Icons.Send />
                     </button>
                 </div>
             </div>
         </div>
-    )
-}
+    );
+};
 
 const root = createRoot(document.getElementById("root")!);
 root.render(<App />);
