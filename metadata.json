@@ -1,0 +1,7 @@
+{
+  "name": "PPE - Prática Profissional Entrevistadora",
+  "description": "Plataforma completa para preparação de carreira com construtor de currículo, simulador de entrevista por voz e teste vocacional.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
