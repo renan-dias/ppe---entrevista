@@ -21,7 +21,9 @@ const Icons = {
   Search: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
   MapPin: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
   Briefcase: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
-  Upload: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+  Upload: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  Speaker: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>,
+  Sparkles: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
 };
 
 const RECRUITER_AVATARS = [
@@ -34,6 +36,47 @@ const RECRUITER_AVATARS = [
 
 // --- API & Types ---
 const API_KEY = process.env.API_KEY;
+
+// Sound Effects System
+const SoundFX = {
+  ctx: null as AudioContext | null,
+  init: () => {
+    if (!SoundFX.ctx) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      SoundFX.ctx = new AudioContextClass();
+    }
+  },
+  playTone: (freq: number, type: OscillatorType, duration: number, vol = 0.1) => {
+    if (!SoundFX.ctx) SoundFX.init();
+    const ctx = SoundFX.ctx!;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  },
+  playConnect: () => {
+     SoundFX.playTone(440, 'sine', 0.1);
+     setTimeout(() => SoundFX.playTone(880, 'sine', 0.2), 100);
+  },
+  playDisconnect: () => {
+     SoundFX.playTone(880, 'sine', 0.1);
+     setTimeout(() => SoundFX.playTone(440, 'sine', 0.2), 100);
+  },
+  playPop: () => {
+      SoundFX.playTone(600, 'sine', 0.05, 0.05);
+  },
+  playPing: () => {
+      SoundFX.playTone(1200, 'triangle', 0.3, 0.05);
+  }
+};
 
 // Resume Data Structure
 interface Skill {
@@ -66,10 +109,16 @@ const initialResumeData: ResumeData = {
   languages: [],
 };
 
-// --- Resume Templates ---
-// 1. Corporate (Clean, Bars)
-// 2. Creative (Modern, Dots)
-// 3. Academic (Text heavy, detailed)
+// --- TTS Helper ---
+const speakText = (text: string) => {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'pt-BR';
+        utterance.rate = 1.1;
+        window.speechSynthesis.speak(utterance);
+    }
+};
 
 // --- Helper Components ---
 
@@ -93,7 +142,7 @@ function Dots({ level }: { level: number }) {
 
 function TypingIndicator() {
   return (
-    <div className="flex space-x-1 p-2 bg-gray-100 dark:bg-dark-700 rounded-2xl rounded-tl-none w-16 items-center justify-center">
+    <div className="flex space-x-1 p-2 bg-white/50 dark:bg-dark-700/50 rounded-2xl rounded-tl-none w-16 items-center justify-center backdrop-blur-sm">
       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
@@ -112,16 +161,22 @@ const App = () => {
     switch (view) {
       case 'home': return <Home setView={setView} />;
       case 'resume': return <ResumeBuilder onBack={() => setView('home')} onComplete={setGlobalResume} />;
-      case 'interview': return <InterviewSimulator onBack={() => setView('home')} globalResume={globalResume} />;
+      case 'interview': return <InterviewSimulator onBack={() => setView('home')} globalResume={globalResume} setGlobalResume={setGlobalResume} />;
       case 'vocational': return <VocationalTest onBack={() => setView('home')} />;
       default: return <Home setView={setView} />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-dark-900 transition-colors duration-300">
+    <div className="min-h-screen flex flex-col font-sans text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-dark-900 transition-colors duration-300 relative overflow-x-hidden">
+       {/* Ambient Gradient Background */}
+      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 dark:opacity-20">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-400/30 rounded-full blur-[100px] animate-pulse-slow"></div>
+          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-400/30 rounded-full blur-[100px] animate-pulse-slow delay-1000"></div>
+      </div>
+
       <Header setView={setView} />
-      <main className="flex-grow container mx-auto px-4 py-6">
+      <main className="flex-grow container mx-auto px-4 py-6 relative z-10">
         {renderView()}
       </main>
       <Footer />
@@ -132,10 +187,10 @@ const App = () => {
 // --- Header / Footer ---
 
 const Header = ({ setView }: { setView: (v: any) => void }) => (
-  <header className="bg-white dark:bg-dark-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-300">
+  <header className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-50 transition-all duration-300">
     <div className="container mx-auto px-4 py-4 flex justify-between items-center">
       <div className="flex items-center space-x-2 cursor-pointer group" onClick={() => setView('home')}>
-        <div className="bg-primary-600 p-2 rounded-lg text-white group-hover:bg-primary-700 transition-colors">
+        <div className="bg-primary-600 p-2 rounded-lg text-white group-hover:bg-primary-700 transition-colors shadow-lg shadow-primary-500/30">
           <Icons.Brain />
         </div>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">PPE <span className="text-primary-600 font-normal hidden sm:inline">- Prática Profissional Entrevistadora</span></h1>
@@ -146,7 +201,7 @@ const Header = ({ setView }: { setView: (v: any) => void }) => (
 );
 
 const Footer = () => (
-  <footer className="bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-gray-700 py-6 mt-auto transition-colors duration-300">
+  <footer className="bg-white/60 dark:bg-dark-800/60 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 py-6 mt-auto transition-colors duration-300">
     <div className="container mx-auto px-4 text-center text-sm text-gray-500 dark:text-gray-400">
       <p>Desenvolvido por <span className="font-semibold text-primary-600">Renan Dias</span></p>
       <a href="https://github.com/renan-dias" target="_blank" rel="noopener noreferrer" className="hover:text-primary-500 transition-colors">github.com/renan-dias</a>
@@ -171,34 +226,34 @@ const ThemeToggle = () => {
 // --- Home Dashboard ---
 
 const Home = ({ setView }: { setView: (v: any) => void }) => (
-  <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-10">
-    <div className="text-center space-y-4 py-10">
-      <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white">Prepare-se para o seu futuro</h2>
-      <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-        A ferramenta definitiva para alavancar sua carreira. Crie currículos perfeitos, simule entrevistas e descubra sua vocação.
+  <div className="max-w-4xl mx-auto space-y-12 animate-fade-in pb-10">
+    <div className="text-center space-y-6 py-12">
+      <h2 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-purple-600 pb-2">Prepare-se para o seu futuro</h2>
+      <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
+        A ferramenta definitiva para alavancar sua carreira. Crie currículos perfeitos, simule entrevistas com IA de voz e descubra sua vocação.
       </p>
     </div>
 
-    <div className="grid md:grid-cols-3 gap-6">
+    <div className="grid md:grid-cols-3 gap-8">
       <DashboardCard
         title="Construtor de Currículo"
         desc="Crie um CV profissional com auxílio de um consultor especialista."
         icon={<Icons.Resume />}
-        color="bg-blue-500"
+        color="bg-gradient-to-br from-blue-500 to-blue-600"
         onClick={() => setView('resume')}
       />
       <DashboardCard
         title="Simulador de Entrevista"
         desc="Pratique com um entrevistador de voz realista em tempo real."
         icon={<Icons.Microphone />}
-        color="bg-emerald-500"
+        color="bg-gradient-to-br from-emerald-500 to-emerald-600"
         onClick={() => setView('interview')}
       />
       <DashboardCard
         title="Teste Vocacional"
         desc="Descubra sua área ideal conversando com nosso psicólogo."
         icon={<Icons.Brain />}
-        color="bg-violet-500"
+        color="bg-gradient-to-br from-violet-500 to-violet-600"
         onClick={() => setView('vocational')}
       />
     </div>
@@ -206,11 +261,11 @@ const Home = ({ setView }: { setView: (v: any) => void }) => (
 );
 
 const DashboardCard = ({ title, desc, icon, color, onClick }: any) => (
-  <div onClick={onClick} className="group bg-white dark:bg-dark-800 rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 dark:border-gray-700 hover:-translate-y-1">
-    <div className={`${color} w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+  <div onClick={onClick} className="group bg-white/80 dark:bg-dark-800/80 backdrop-blur-lg rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer border border-white/20 dark:border-gray-700/50 hover:-translate-y-2 hover:bg-white dark:hover:bg-dark-800">
+    <div className={`${color} w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
       {icon}
     </div>
-    <h3 className="text-xl font-bold mb-2 text-slate-800 dark:text-slate-100">{title}</h3>
+    <h3 className="text-xl font-bold mb-3 text-slate-800 dark:text-slate-100">{title}</h3>
     <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{desc}</p>
   </div>
 );
@@ -233,7 +288,7 @@ const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete:
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col">
       <div className="flex items-center space-x-2 mb-4">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
+        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Construtor de Currículo</h2>
       </div>
 
@@ -253,9 +308,9 @@ const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete:
               <button
                 key={t.id}
                 onClick={() => { setTemplate(t.id as TemplateType); setStep('chat'); }}
-                className={`p-6 bg-white dark:bg-dark-800 border-2 ${template === t.id ? t.color : 'border-transparent'} hover:border-primary-500 rounded-xl shadow-lg transition-all text-left space-y-2`}
+                className={`p-6 bg-white/90 dark:bg-dark-800/90 backdrop-blur-sm border-2 ${template === t.id ? t.color : 'border-transparent'} hover:border-primary-500 rounded-xl shadow-lg transition-all text-left space-y-2`}
               >
-                <div className={`w-full h-32 bg-gray-100 dark:bg-gray-700 rounded-lg mb-4 flex items-center justify-center text-gray-400 font-semibold`}>
+                <div className={`w-full h-32 bg-gray-100 dark:bg-gray-700/50 rounded-lg mb-4 flex items-center justify-center text-gray-400 font-semibold`}>
                     Preview {t.name}
                 </div>
                 <h4 className="text-lg font-bold text-slate-800 dark:text-white">{t.name}</h4>
@@ -267,7 +322,7 @@ const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete:
           <div className="w-full max-w-lg mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
               <label className="text-sm font-semibold text-gray-500 mb-2 block">Já tem um resumo? Cole aqui para acelerar (Opcional):</label>
               <textarea 
-                className="w-full p-3 rounded-lg border dark:bg-dark-700 dark:border-gray-600 text-sm h-24"
+                className="w-full p-3 rounded-lg border dark:bg-dark-700/50 dark:border-gray-600 text-sm h-24 backdrop-blur-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 placeholder="Ex: Sou João, engenheiro de software com 5 anos de experiência..."
                 value={importedText}
                 onChange={e => setImportedText(e.target.value)}
@@ -346,6 +401,10 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
   const addMessage = (role: 'user' | 'model', content: string, widget?: any) => {
     setMessages(prev => [...prev, { role, content, widget }]);
     setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    if(role === 'model') {
+        speakText(content);
+        SoundFX.playPop();
+    }
   };
 
   const handleSend = async (text: string, isHiddenContext = false) => {
@@ -374,8 +433,8 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
         INSTRUÇÕES:
         1. Analise a resposta do usuário.
         2. Atualize o JSON do currículo se houver novas informações.
-        3. Formule a próxima pergunta (seja breve, direto e amigável).
-        4. Use perguntas curtas. Ex: "E qual seu email?"
+        3. Formule a próxima pergunta (seja BREVE, direto e amigável).
+        4. FAÇA PERGUNTAS CURTAS. Ex: "E qual seu email?", "Onde você trabalhou antes?". Evite textos longos.
         5. Se o usuário falar sobre uma área (ex: "sou dev"), sugira skills dessa área no widget.
         6. Se pedir contatos, peça LinkedIn/GitHub/Email e use o widget de contato.
         7. SE TIVER DADOS SUFICIENTES ou o usuário pedir para gerar, defina "completed": true.
@@ -442,12 +501,17 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
   };
 
   return (
-    <div className="flex flex-col flex-grow bg-white dark:bg-dark-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="flex flex-col flex-grow bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 overflow-hidden">
       <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-hide">
         {messages.map((m, i) => (
           <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${m.role === 'user' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-gray-100 dark:bg-dark-700 text-slate-800 dark:text-gray-200 rounded-tl-none'}`}>
+            <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm relative group backdrop-blur-sm ${m.role === 'user' ? 'bg-primary-600/90 text-white rounded-tr-none' : 'bg-white/60 dark:bg-dark-700/60 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600'}`}>
               {m.content}
+              {m.role === 'model' && (
+                  <button onClick={() => speakText(m.content)} className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-primary-500">
+                      <Icons.Speaker />
+                  </button>
+              )}
             </div>
             {m.widget?.type === 'skills' && (
                 <SkillsWidget suggestions={m.widget.data} currentSkills={resumeData.skills} onSave={(s) => { handleSkillsUpdate(s); handleSend("Skills definidas."); }} />
@@ -465,7 +529,7 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
         <div ref={scrollRef} />
       </div>
 
-      <div className="p-4 bg-gray-50 dark:bg-dark-900 border-t border-gray-200 dark:border-gray-700">
+      <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
         {quickReplies.length > 0 && !loading && (
           <div className="flex flex-wrap gap-2 mb-3 animate-fade-in">
             {quickReplies.map((r, i) => (
@@ -478,7 +542,7 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
         <div className="flex space-x-2">
           <input
             type="text"
-            className="flex-grow bg-white dark:bg-dark-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400"
+            className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400 backdrop-blur-sm"
             placeholder="Digite sua resposta..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -510,7 +574,7 @@ const SkillsWidget = ({ suggestions, currentSkills, onSave }: any) => {
     }
 
     return (
-        <div className="mt-2 p-4 bg-white dark:bg-dark-800 rounded-xl border border-gray-200 dark:border-gray-600 w-full max-w-md shadow-md animate-fade-in">
+        <div className="mt-2 p-4 bg-white/90 dark:bg-dark-800/90 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-600 w-full max-w-md shadow-md animate-fade-in">
             <h4 className="font-semibold mb-3 text-sm text-gray-500 uppercase tracking-wide">Defina seu nível de habilidade</h4>
             <div className="space-y-3">
                 {selected.map((s, i) => (
@@ -536,7 +600,7 @@ const SkillsWidget = ({ suggestions, currentSkills, onSave }: any) => {
 const ContactWidget = ({ currentInfo, onSave }: any) => {
     const [info, setInfo] = useState(currentInfo);
     return (
-        <div className="mt-2 p-4 bg-white dark:bg-dark-800 rounded-xl border border-gray-200 dark:border-gray-600 w-full max-w-md space-y-3 shadow-md animate-fade-in">
+        <div className="mt-2 p-4 bg-white/90 dark:bg-dark-800/90 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-600 w-full max-w-md space-y-3 shadow-md animate-fade-in">
              <h4 className="font-semibold mb-1 text-sm text-gray-500 uppercase tracking-wide">Informações de Contato</h4>
             <input type="text" placeholder="LinkedIn URL" value={info.linkedin} onChange={e => setInfo({...info, linkedin: e.target.value})} className="w-full p-2 text-sm border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
             <input type="text" placeholder="GitHub URL" value={info.github} onChange={e => setInfo({...info, github: e.target.value})} className="w-full p-2 text-sm border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
@@ -565,7 +629,7 @@ const ResumeEditor = ({ data, setData, onPreview }: any) => {
 
     return (
         <div className="flex flex-col h-full space-y-4 animate-fade-in pb-10">
-             <div className="flex justify-between items-center bg-white dark:bg-dark-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+             <div className="flex justify-between items-center bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-4 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50">
                 <h3 className="text-xl font-bold text-slate-800 dark:text-white">Revisar Dados</h3>
                 <button onClick={onPreview} className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors shadow-md">
                     <Icons.Check /> <span>Gerar Visualização</span>
@@ -574,7 +638,7 @@ const ResumeEditor = ({ data, setData, onPreview }: any) => {
             
             <div className="flex-grow overflow-y-auto space-y-6 p-1">
                 {/* Personal Info */}
-                <section className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
+                <section className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 space-y-4">
                     <h4 className="text-lg font-semibold border-b pb-2 dark:border-gray-700 text-slate-800 dark:text-white">Dados Pessoais</h4>
                     <div className="grid md:grid-cols-2 gap-4">
                         <Input label="Nome Completo" value={data.personalInfo.fullName} onChange={(e) => handleChange('personalInfo', 'fullName', e.target.value)} />
@@ -586,7 +650,7 @@ const ResumeEditor = ({ data, setData, onPreview }: any) => {
                     </div>
                 </section>
 
-                <section className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
+                <section className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 space-y-4">
                     <h4 className="text-lg font-semibold border-b pb-2 dark:border-gray-700 text-slate-800 dark:text-white">Resumo Profissional</h4>
                     <textarea 
                         className="w-full h-32 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent focus:ring-2 focus:ring-primary-500 text-slate-800 dark:text-white" 
@@ -596,17 +660,17 @@ const ResumeEditor = ({ data, setData, onPreview }: any) => {
                 </section>
 
                 {/* Experience - simplified list for brevity */}
-                 <section className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-4">
+                 <section className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 space-y-4">
                     <div className="flex justify-between items-center">
                         <h4 className="text-lg font-semibold text-slate-800 dark:text-white">Experiência</h4>
                     </div>
                     {data.experience.map((exp: any, i: number) => (
-                        <div key={i} className="p-4 border rounded-lg dark:border-gray-700 space-y-2 bg-gray-50 dark:bg-dark-900">
+                        <div key={i} className="p-4 border rounded-lg dark:border-gray-700 space-y-2 bg-gray-50/50 dark:bg-dark-900/50">
                             <div className="grid grid-cols-2 gap-2">
                                 <Input label="Cargo" value={exp.role} onChange={(e) => handleChange('experience', 'role', e.target.value, i)} />
                                 <Input label="Empresa" value={exp.company} onChange={(e) => handleChange('experience', 'company', e.target.value, i)} />
                             </div>
-                            <textarea className="w-full p-2 border rounded dark:bg-dark-700 dark:border-gray-600 text-slate-800 dark:text-white" value={exp.description} onChange={(e) => handleChange('experience', 'description', e.target.value, i)} />
+                            <textarea className="w-full p-2 border rounded dark:bg-dark-700/50 dark:border-gray-600 text-slate-800 dark:text-white bg-transparent" value={exp.description} onChange={(e) => handleChange('experience', 'description', e.target.value, i)} />
                         </div>
                     ))}
                 </section>
@@ -639,7 +703,7 @@ const ResumePreview = ({ data, template, onEdit }: any) => {
                 </div>
             </div>
             
-            <div className="flex-grow overflow-y-auto bg-gray-200 dark:bg-gray-800 p-8 rounded-xl flex justify-center shadow-inner border border-gray-300 dark:border-gray-700">
+            <div className="flex-grow overflow-y-auto bg-gray-200/50 dark:bg-gray-800/50 p-8 rounded-xl flex justify-center shadow-inner border border-gray-300 dark:border-gray-700 backdrop-blur-sm">
                 <div className="transform origin-top scale-95 md:scale-100 transition-transform">
                     <div className="bg-white text-black w-[210mm] min-h-[297mm] shadow-2xl p-0 overflow-hidden print:w-full print:h-full print:shadow-none print:m-0">
                         {/* Template Renderer */}
@@ -817,7 +881,7 @@ const AcademicTemplate = ({ data }: { data: ResumeData }) => (
     </div>
 );
 
-// --- Interview Simulator (Enhanced with Job Board) ---
+// --- Interview Simulator (Enhanced with Job Board & Glassmorphism) ---
 
 interface JobVacancy {
     id: string;
@@ -838,7 +902,7 @@ const Step = ({ active, completed, number, label }: any) => (
     </div>
 )
 
-const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, globalResume: ResumeData | null }) => {
+const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack: () => void, globalResume: ResumeData | null, setGlobalResume: (data: ResumeData) => void }) => {
   const [viewMode, setViewMode] = useState<'search' | 'resume_upload' | 'live' | 'report'>('search');
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
@@ -862,6 +926,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
   const searchJobs = async () => {
       setLoadingJobs(true);
       setJobs([]);
+      SoundFX.playPop();
       const client = new GoogleGenAI({ apiKey: API_KEY });
       
       const prompt = `Gere uma lista JSON de 4 a 5 vagas de emprego realistas para "${searchQuery}" em "${searchLocation || 'Brasil'}".
@@ -893,6 +958,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
   };
 
   const handleSelectJob = (job: JobVacancy) => {
+      SoundFX.playPop();
       setSelectedJob(job);
       setViewMode('resume_upload');
   }
@@ -902,22 +968,70 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
       if (!file) return;
 
       setUploading(true);
+      SoundFX.playPop();
       
-      // Simulate processing time
-      await new Promise(r => setTimeout(r, 1500));
+      const client = new GoogleGenAI({ apiKey: API_KEY });
 
-      if (file.type === 'text/plain') {
-          const text = await file.text();
-          setResumeText(text);
-      } else {
-          // Fallback for PDF (simulation)
-           setResumeText(`[SISTEMA: Currículo "${file.name}" processado com sucesso]\n\nNOME: João Silva (Extraído)\nCARGO: Desenvolvedor (Extraído)\nEXPERIÊNCIA: ...\n\n(O recrutador terá acesso a este contexto simulado)`);
+      try {
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]);
+            };
+            reader.readAsDataURL(file);
+          });
+
+          // Use Gemini 2.5 Flash to extract data
+          const prompt = `
+            EXTRACT all relevant data from this resume image/document into this specific JSON structure.
+            If the image is not a resume, return an empty structure.
+            
+            Structure:
+            {
+                "personalInfo": { "fullName": "", "email": "", "phone": "", "linkedin": "", "location": "" },
+                "summary": "Professional summary...",
+                "experience": [{ "role": "", "company": "", "duration": "", "description": "" }],
+                "skills": [{ "name": "", "level": 3 }]
+            }
+          `;
+
+          const result = await client.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: [
+                  { inlineData: { mimeType: file.type, data: base64 } },
+                  { text: prompt }
+              ],
+              config: { responseMimeType: 'application/json' }
+          });
+
+          const extractedData = JSON.parse(result.text || "{}");
+          
+          if (extractedData.personalInfo) {
+              setGlobalResume(extractedData as ResumeData);
+              const formattedText = `
+                NOME: ${extractedData.personalInfo.fullName}
+                RESUMO: ${extractedData.summary}
+                EXPERIÊNCIA: ${extractedData.experience?.map((e: any) => `${e.role} at ${e.company}`).join('; ')}
+                SKILLS: ${extractedData.skills?.map((s: any) => s.name).join(', ')}
+              `;
+              setResumeText(formattedText);
+              SoundFX.playPing();
+          } else {
+              setResumeText("Não foi possível extrair dados legíveis do currículo. O recrutador fará perguntas gerais.");
+          }
+
+      } catch (err) {
+          console.error("Extraction error:", err);
+          setResumeText("Erro ao ler arquivo. O recrutador fará perguntas gerais.");
       }
+
       setUploading(false);
   }
 
   const handleImportResume = () => {
       if (globalResume) {
+          SoundFX.playPop();
           const text = `Nome: ${globalResume.personalInfo.fullName}
           Resumo: ${globalResume.summary}
           Experiência: ${globalResume.experience.map(e => `${e.role} em ${e.company} (${e.duration})`).join('; ')}
@@ -927,10 +1041,9 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
   }
 
   const endSession = async () => {
+    SoundFX.playDisconnect();
     if (sessionRef.current) {
         // Disconnect
-        // Note: SDK doesn't have explicit disconnect in types sometimes, but usually does or we just let it drop.
-        // We will generate report now.
     }
     setConnected(false);
     if(audioContextRef.current) audioContextRef.current.close();
@@ -941,12 +1054,17 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
 
   const generateReport = async () => {
       const client = new GoogleGenAI({ apiKey: API_KEY });
+      // Create a more robust transcript fallback if transcription failed
+      const transcriptText = currentTranscriptRef.current.length > 0 
+          ? currentTranscriptRef.current.join('\n') 
+          : "Transcrição indisponível. Baseie-se no fato de que o candidato completou a entrevista.";
+
       const prompt = `
         Analise esta entrevista de emprego baseada nas transcrições abaixo.
         Vaga: ${selectedJob?.title} na ${selectedJob?.company}.
         
-        Transcrições (incompletas/fragmentadas):
-        ${currentTranscriptRef.current.join('\n')}
+        Transcrições:
+        ${transcriptText}
 
         Gere um relatório JSON:
         {
@@ -965,6 +1083,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
               config: { responseMimeType: 'application/json' }
           });
           setFinalReport(JSON.parse(res.text || "{}"));
+          SoundFX.playPing();
       } catch (e) {
           console.error("Erro no relatório", e);
           setFinalReport({ score: 0, summary: "Não foi possível gerar análise detalhada.", strengths: [], weaknesses: [], tips: [] });
@@ -973,6 +1092,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
 
   const startInterview = async () => {
     if (!selectedJob) return;
+    SoundFX.playConnect();
     setViewMode('live');
     setAvatarUrl(RECRUITER_AVATARS[Math.floor(Math.random() * RECRUITER_AVATARS.length)]);
     setTranscript([]);
@@ -1001,8 +1121,8 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
         tools: [{ functionDeclarations: [endInterviewTool] }],
-        inputAudioTranscription: { model: "google-1-latest" },
-        outputAudioTranscription: { model: "google-1-latest" },
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
         systemInstruction: `
           CONTEXTO:
           Você é um Recrutador Sênior da empresa ${selectedJob.company}.
@@ -1012,11 +1132,11 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
           DESCRIÇÃO DA VAGA: ${selectedJob.description}
           REQUISITOS: ${selectedJob.requirements.join(', ')}
 
-          DADOS DO CANDIDATO (Do PDF/Currículo):
+          DADOS DO CANDIDATO (Extraídos do Arquivo):
           ${resumeText}
 
           SUA MISSÃO:
-          1. INÍCIO IMEDIATO: Assim que a conexão abrir, FALE PRIMEIRO. Dê "Bom dia/Boa tarde", apresente-se como recrutador da ${selectedJob.company} e diga que analisou o currículo.
+          1. INÍCIO IMEDIATO: Assim que receber a mensagem "START", FALE PRIMEIRO. Dê "Bom dia/Boa tarde", apresente-se como recrutador da ${selectedJob.company} e cite algo específico do currículo dele para mostrar que você leu.
           2. Conduza uma entrevista realista de 5 a 10 minutos (simulado).
           3. Faça perguntas sobre a experiência dele baseada no currículo e como se conecta com a vaga.
           4. Seja profissional mas cordial.
@@ -1026,6 +1146,17 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
       callbacks: {
         onopen: () => {
             setConnected(true);
+            
+            // Trigger the model to start immediately with a hidden message
+            setTimeout(() => {
+                session.sendRealtimeInput({
+                    content: {
+                        role: "user",
+                        parts: [{ text: "O candidato entrou na sala. Inicie a entrevista agora se apresentando." }]
+                    }
+                });
+            }, 500);
+
             const source = inputAudioContext.createMediaStreamSource(stream);
             const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
             processor.onaudioprocess = (e) => {
@@ -1108,8 +1239,17 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
              // Collect Transcription for report
              const userT = msg.serverContent?.inputTranscription?.text;
              const modelT = msg.serverContent?.outputTranscription?.text;
-             if (userT) currentTranscriptRef.current.push(`Candidato: ${userT}`);
-             if (modelT) currentTranscriptRef.current.push(`Recrutador: ${modelT}`);
+             
+             if (userT) {
+                 const line = `Candidato: ${userT}`;
+                 setTranscript(prev => [...prev, line]);
+                 currentTranscriptRef.current.push(line);
+             }
+             if (modelT) {
+                 const line = `Recrutador: ${modelT}`;
+                 setTranscript(prev => [...prev, line]);
+                 currentTranscriptRef.current.push(line);
+             }
         },
         onclose: () => {
             setConnected(false);
@@ -1126,7 +1266,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
   return (
     <div className="max-w-4xl mx-auto h-[calc(100vh-140px)] flex flex-col">
        <div className="flex items-center space-x-2 mb-4">
-            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
+            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
                 {viewMode === 'search' && "Encontrar Vaga"}
                 {viewMode === 'resume_upload' && "Preparação"}
@@ -1145,18 +1285,18 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
         </div>
 
         {viewMode === 'search' && (
-            <div className="bg-white dark:bg-dark-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 space-y-6">
+            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 space-y-6">
                 <div className="grid md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Cargo ou Palavra-chave (ex: Desenvolvedor React)" className="p-3 border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                    <input type="text" placeholder="Localização (ex: São Paulo, Remoto)" className="p-3 border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500" value={searchLocation} onChange={e => setSearchLocation(e.target.value)} />
+                    <input type="text" placeholder="Cargo ou Palavra-chave (ex: Desenvolvedor React)" className="p-3 border rounded-lg dark:bg-dark-700/50 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 bg-white/50 backdrop-blur-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input type="text" placeholder="Localização (ex: São Paulo, Remoto)" className="p-3 border rounded-lg dark:bg-dark-700/50 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 bg-white/50 backdrop-blur-sm" value={searchLocation} onChange={e => setSearchLocation(e.target.value)} />
                 </div>
-                <button onClick={searchJobs} disabled={loadingJobs} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-lg transition-colors flex justify-center items-center">
+                <button onClick={searchJobs} disabled={loadingJobs} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-lg transition-colors flex justify-center items-center shadow-lg">
                     {loadingJobs ? <span className="animate-pulse">Buscando vagas com IA...</span> : <span className="flex items-center gap-2"><Icons.Search /> Buscar Vagas</span>}
                 </button>
 
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     {jobs.map(job => (
-                        <div key={job.id} className="border border-gray-200 dark:border-gray-700 p-4 rounded-xl hover:shadow-md transition-shadow bg-gray-50 dark:bg-dark-900 cursor-pointer group" onClick={() => handleSelectJob(job)}>
+                        <div key={job.id} className="border border-gray-200/50 dark:border-gray-700/50 p-4 rounded-xl hover:shadow-md transition-shadow bg-white/60 dark:bg-dark-900/60 cursor-pointer group backdrop-blur-sm" onClick={() => handleSelectJob(job)}>
                             <div className="flex justify-between items-start">
                                 <div>
                                     <h3 className="font-bold text-lg text-primary-600 group-hover:underline">{job.title}</h3>
@@ -1176,8 +1316,8 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
         )}
 
         {viewMode === 'resume_upload' && selectedJob && (
-             <div className="bg-white dark:bg-dark-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center text-center space-y-6 animate-fade-in">
-                 <div className="w-full text-left bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900">
+             <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-8 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 flex flex-col items-center text-center space-y-6 animate-fade-in">
+                 <div className="w-full text-left bg-blue-50/50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900">
                      <h3 className="font-bold text-blue-800 dark:text-blue-300">Vaga Selecionada: {selectedJob.title}</h3>
                      <p className="text-sm text-blue-600 dark:text-blue-400">{selectedJob.company}</p>
                  </div>
@@ -1188,29 +1328,29 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
                  </div>
 
                  <div className="grid md:grid-cols-2 gap-6 w-full">
-                     <div className={`border-2 border-dashed ${uploading ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-300 dark:border-gray-600'} rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 transition-colors cursor-pointer relative`}>
-                         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.txt" onChange={handleResumeUpload} disabled={uploading} />
+                     <div className={`border-2 border-dashed ${uploading ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20' : 'border-gray-300 dark:border-gray-600'} rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 transition-colors cursor-pointer relative hover:bg-white/50 dark:hover:bg-dark-700/50`}>
+                         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.txt,.jpg,.png" onChange={handleResumeUpload} disabled={uploading} />
                          {uploading ? (
                              <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
                          ) : (
                              <Icons.Upload />
                          )}
-                         <span className="text-sm font-medium">{uploading ? "Processando..." : "Upload Arquivo"}</span>
-                         <span className="text-xs text-gray-400">PDF, DOCX, TXT</span>
+                         <span className="text-sm font-medium">{uploading ? "Analisando com IA..." : "Upload Arquivo"}</span>
+                         <span className="text-xs text-gray-400">PDF, DOCX, TXT, IMG</span>
                      </div>
-                     <button onClick={handleImportResume} disabled={!globalResume} className="border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 hover:text-primary-600 transition-colors disabled:opacity-50">
+                     <button onClick={handleImportResume} disabled={!globalResume} className="border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 hover:text-primary-600 transition-colors disabled:opacity-50 hover:bg-white/50 dark:hover:bg-dark-700/50">
                          <Icons.Resume />
                          <span className="text-sm font-medium">Importar do Construtor</span>
                      </button>
                  </div>
 
                  {resumeText && (
-                    <div className="w-full animate-fade-in">
+                    <div className="w-full animate-fade-in text-left">
                         <div className="flex items-center gap-2 text-green-600 mb-2 font-medium">
                             <Icons.Check /> <span>Currículo processado com sucesso</span>
                         </div>
                          <textarea 
-                            className="w-full h-32 p-3 text-sm border rounded-lg bg-gray-50 dark:bg-dark-900 dark:border-gray-700 dark:text-white" 
+                            className="w-full h-32 p-3 text-sm border rounded-lg bg-gray-50/50 dark:bg-dark-900/50 dark:border-gray-700 dark:text-white backdrop-blur-sm" 
                             placeholder="O texto do seu currículo aparecerá aqui..." 
                             value={resumeText} 
                             readOnly 
@@ -1218,44 +1358,52 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
                     </div>
                  )}
 
-                 <button onClick={startInterview} disabled={!resumeText} className="w-full bg-green-600 hover:bg-green-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
+                 <button onClick={startInterview} disabled={!resumeText} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
                      <Icons.Microphone /> Iniciar Entrevista Agora
                  </button>
              </div>
         )}
 
         {viewMode === 'live' && (
-            <div className="flex-grow flex flex-col items-center justify-center space-y-8 bg-gradient-to-b from-gray-900 to-black rounded-xl relative overflow-hidden p-8 text-white shadow-2xl animate-fade-in">
+            <div className="flex-grow flex flex-col items-center justify-center space-y-8 bg-gradient-to-b from-gray-900/90 to-black/90 backdrop-blur-xl rounded-2xl relative overflow-hidden p-8 text-white shadow-2xl animate-fade-in border border-white/10">
                 {/* Background Pulse Animation */}
-                {isSpeaking && <div className="absolute inset-0 bg-primary-500/10 animate-pulse"></div>}
+                {isSpeaking && <div className="absolute inset-0 bg-primary-500/20 animate-pulse duration-1000"></div>}
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                 
                 <div className="relative z-10 flex flex-col items-center space-y-6">
-                    <div className={`relative w-40 h-40 rounded-full border-4 ${isSpeaking ? 'border-green-400 shadow-[0_0_30px_rgba(74,222,128,0.5)]' : 'border-gray-600'} transition-all duration-300`}>
+                    <div className={`relative w-48 h-48 rounded-full border-4 ${isSpeaking ? 'border-green-400 shadow-[0_0_50px_rgba(74,222,128,0.6)] scale-105' : 'border-gray-600'} transition-all duration-300`}>
                         <img src={avatarUrl} alt="Recruiter" className="w-full h-full object-cover rounded-full" />
                         {isSpeaking && (
-                            <div className="absolute -bottom-2 right-1/2 translate-x-1/2 bg-green-500 text-xs font-bold px-2 py-0.5 rounded-full animate-bounce">
-                                FALANDO
+                            <div className="absolute -bottom-4 right-1/2 translate-x-1/2 bg-green-500 text-sm font-bold px-3 py-1 rounded-full animate-bounce shadow-lg">
+                                FALANDO...
                             </div>
                         )}
                     </div>
                     <div className="text-center">
-                        <h3 className="text-2xl font-bold">Recrutador da {selectedJob?.company}</h3>
-                        <p className="text-gray-400">Entrevista para {selectedJob?.title}</p>
+                        <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">Recrutador</h3>
+                        <p className="text-blue-300 font-medium">{selectedJob?.company}</p>
                     </div>
                 </div>
 
-                <div className="w-full max-w-2xl bg-black/50 backdrop-blur-sm p-4 rounded-lg text-center h-24 flex items-center justify-center">
-                    <p className="text-gray-300 italic">{isSpeaking ? "Ouvindo recrutador..." : "Sua vez de falar..."}</p>
+                <div className="w-full max-w-2xl bg-white/10 backdrop-blur-md border border-white/10 p-6 rounded-2xl text-center h-48 overflow-y-auto flex flex-col justify-end shadow-inner">
+                    <div className="space-y-3 text-sm">
+                        {transcript.slice(-3).map((line, i) => (
+                             <p key={i} className={`py-1 px-3 rounded-lg inline-block ${line.startsWith('Recrutador') ? 'bg-blue-900/40 text-blue-200 self-start' : 'bg-gray-700/40 text-gray-200 self-end'}`}>{line}</p>
+                        ))}
+                    </div>
+                    <p className="text-gray-400 italic text-xs mt-4 border-t border-white/10 pt-2 flex items-center justify-center gap-2">
+                        {isSpeaking ? <span className="flex gap-1"><span className="w-1 h-1 bg-green-400 rounded-full animate-ping"></span> Ouvindo...</span> : "Sua vez de falar..."}
+                    </p>
                 </div>
 
-                <button onClick={endSession} className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-all">
+                <button onClick={endSession} className="bg-red-600/90 hover:bg-red-700 text-white px-10 py-4 rounded-full font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-all backdrop-blur-sm border border-red-500/50">
                     <Icons.Stop /> Encerrar Chamada
                 </button>
             </div>
         )}
 
         {viewMode === 'report' && (
-            <div className="bg-white dark:bg-dark-800 p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 space-y-6 animate-fade-in">
+            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-8 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 space-y-6 animate-fade-in">
                 <h3 className="text-2xl font-bold text-center mb-6">Feedback da Entrevista</h3>
                 
                 {!finalReport ? (
@@ -1266,13 +1414,13 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
                 ) : (
                     <div className="space-y-8">
                         <div className="flex justify-center">
-                            <div className="w-32 h-32 rounded-full border-8 border-primary-500 flex items-center justify-center flex-col">
+                            <div className="w-32 h-32 rounded-full border-8 border-primary-500 flex items-center justify-center flex-col shadow-[0_0_20px_rgba(14,165,233,0.3)] bg-white dark:bg-dark-900">
                                 <span className="text-4xl font-black text-primary-600">{finalReport.score}</span>
                                 <span className="text-xs uppercase font-bold text-gray-400">Nota / 10</span>
                             </div>
                         </div>
 
-                        <div className="bg-blue-50 dark:bg-dark-900 p-6 rounded-xl border border-blue-100 dark:border-gray-700">
+                        <div className="bg-blue-50/50 dark:bg-dark-900/50 p-6 rounded-xl border border-blue-100 dark:border-gray-700 backdrop-blur-sm">
                             <h4 className="font-bold text-lg mb-2 text-blue-800 dark:text-blue-300">Resumo</h4>
                             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{finalReport.summary}</p>
                         </div>
@@ -1282,7 +1430,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
                                 <h4 className="font-bold text-green-600 flex items-center gap-2"><Icons.Check /> Pontos Fortes</h4>
                                 <ul className="space-y-2">
                                     {finalReport.strengths.map((s:string, i:number) => (
-                                        <li key={i} className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-sm text-green-800 dark:text-green-200 border border-green-100 dark:border-green-900">{s}</li>
+                                        <li key={i} className="bg-green-50/50 dark:bg-green-900/20 p-3 rounded-lg text-sm text-green-800 dark:text-green-200 border border-green-100 dark:border-green-900">{s}</li>
                                     ))}
                                 </ul>
                             </div>
@@ -1290,7 +1438,7 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
                                 <h4 className="font-bold text-red-500 flex items-center gap-2"><Icons.Trash /> Pontos a Melhorar</h4>
                                 <ul className="space-y-2">
                                     {finalReport.weaknesses.map((s:string, i:number) => (
-                                        <li key={i} className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-sm text-red-800 dark:text-red-200 border border-red-100 dark:border-red-900">{s}</li>
+                                        <li key={i} className="bg-red-50/50 dark:bg-red-900/20 p-3 rounded-lg text-sm text-red-800 dark:text-red-200 border border-red-100 dark:border-red-900">{s}</li>
                                     ))}
                                 </ul>
                             </div>
@@ -1300,14 +1448,14 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
                              <h4 className="font-bold text-purple-600 mb-3 flex items-center gap-2"><Icons.Brain /> Dicas do Especialista</h4>
                              <div className="grid gap-3">
                                 {finalReport.tips.map((s:string, i:number) => (
-                                    <div key={i} className="p-3 bg-gray-50 dark:bg-dark-900 border-l-4 border-purple-500 text-gray-700 dark:text-gray-300 text-sm">
+                                    <div key={i} className="p-3 bg-gray-50/50 dark:bg-dark-900/50 border-l-4 border-purple-500 text-gray-700 dark:text-gray-300 text-sm backdrop-blur-sm">
                                         {s}
                                     </div>
                                 ))}
                              </div>
                         </div>
                         
-                        <button onClick={() => setViewMode('search')} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                        <button onClick={() => setViewMode('search')} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors shadow-lg">
                             Nova Entrevista
                         </button>
                     </div>
@@ -1321,99 +1469,158 @@ const InterviewSimulator = ({ onBack, globalResume }: { onBack: () => void, glob
 // --- Vocational Test ---
 
 const VocationalTest = ({ onBack }: { onBack: () => void }) => {
-    const [messages, setMessages] = useState<{role: 'user'|'model', content: string}[]>([]);
-    const [input, setInput] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [ai, setAi] = useState<GoogleGenAI | null>(null);
-    const scrollRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState<any>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hasStarted = useRef(false);
 
-    useEffect(() => {
-        const client = new GoogleGenAI({ apiKey: API_KEY });
-        setAi(client);
-        setLoading(true);
-        setTimeout(() => {
-            setMessages([{ role: 'model', content: "Olá! Sou seu psicólogo de carreira virtual. Vamos descobrir juntos qual caminho profissional combina mais com sua personalidade e interesses. Para começar, o que você mais gosta de fazer no seu tempo livre?" }]);
-            setLoading(false);
-        }, 1000);
-    }, []);
-
-    const handleSend = async () => {
-        if(!input.trim() || !ai) return;
-        const newMsgs = [...messages, { role: 'user' as const, content: input }];
-        setMessages(newMsgs);
-        setInput("");
-        setLoading(true);
-
-        const history = newMsgs.map(m => `${m.role === 'user' ? 'Usuário' : 'Psicólogo'}: ${m.content}`).join('\n');
-        const prompt = `
-            Você é um orientador vocacional e psicólogo experiente.
-            Histórico:
-            ${history}
-
-            Objetivo: Fazer perguntas investigativas (uma por vez) para entender o perfil do usuário (RIASEC, MBTI simplificado, Interesses).
-            Após cerca de 5 a 7 perguntas, ou se tiver certeza, forneça um "Resultado" detalhado sugerindo 3 áreas de atuação e explicando o porquê.
-            Mantenha o tom empático, calmo e profissional.
-            Seja sucinto nas perguntas.
-        `;
-
-        try {
-            const res = await ai.models.generateContent({
-                model: 'gemini-3-pro-preview',
-                contents: prompt,
-            });
-            const text = res.text || "Desculpe, pode repetir?";
-            setMessages(prev => [...prev, { role: 'model', content: text }]);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
+  useEffect(() => {
+    if(!hasStarted.current) {
+        hasStarted.current = true;
+        addMessage('model', "Olá! Sou seu psicólogo vocacional. Vamos conversar para descobrir qual área combina mais com você. Para começar, me conte um pouco sobre seus hobbies e o que você gosta de fazer no tempo livre.");
     }
+  }, []);
 
-    useEffect(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+  const addMessage = (role: 'user' | 'model', content: string) => {
+    setMessages(prev => [...prev, { role, content }]);
+    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    if(role === 'model') {
+        speakText(content);
+        SoundFX.playPop();
+    }
+  };
 
-    return (
-        <div className="max-w-3xl mx-auto h-[calc(100vh-140px)] flex flex-col">
-            <div className="flex items-center space-x-2 mb-4">
-                <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300"><Icons.Home /></button>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
-            </div>
+  const handleSend = async () => {
+      if (!input.trim()) return;
+      const userInput = input;
+      addMessage('user', userInput);
+      setInput("");
+      setLoading(true);
 
-            <div className="flex-grow bg-white dark:bg-dark-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-                <div className="flex-grow overflow-y-auto p-6 space-y-6 scrollbar-hide">
+      const client = new GoogleGenAI({ apiKey: API_KEY });
+      const history = messages.map(m => `${m.role}: ${m.content}`).join('\n');
+      
+      const prompt = `
+        Você é um psicólogo especialista em orientação vocacional.
+        CONVERSA ATUAL:
+        ${history}
+        User: ${userInput}
+
+        SEU OBJETIVO:
+        Fazer perguntas para entender a personalidade, interesses e aptidões do usuário.
+        Faça 1 pergunta por vez. Seja empático.
+        
+        CRITÉRIO DE PARADA:
+        Se você já tiver informações suficientes (após cerca de 5 ou 6 trocas), gere um JSON final com o resultado.
+        Caso contrário, continue a conversa com uma pergunta de texto normal.
+
+        FORMATO DE RESPOSTA (JSON se for resultado, Texto puro se for pergunta):
+        Se for resultado:
+        {
+            "result": {
+                "area": "Nome da Área (ex: Tecnologia, Saúde)",
+                "description": "Por que essa área combina...",
+                "careers": ["Carreira 1", "Carreira 2", "Carreira 3"]
+            }
+        }
+        
+        Se for pergunta: Apenas o texto da pergunta.
+      `;
+
+      try {
+          const res = await client.models.generateContent({
+              model: 'gemini-3-pro-preview',
+              contents: prompt,
+          });
+          
+          const text = res.text?.trim() || "";
+          
+          if (text.startsWith('{')) {
+              try {
+                  const json = JSON.parse(text);
+                  setReport(json.result);
+                  SoundFX.playPing();
+              } catch (e) {
+                   addMessage('model', text); 
+              }
+          } else {
+              addMessage('model', text);
+          }
+      } catch (e) {
+          addMessage('model', "Desculpe, tive um erro. Pode repetir?");
+      }
+      setLoading(false);
+  }
+
+  return (
+    <div className="h-[calc(100vh-140px)] flex flex-col">
+       <div className="flex items-center space-x-2 mb-4">
+        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
+      </div>
+
+      <div className="flex-grow flex flex-col bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 overflow-hidden relative">
+          {!report ? (
+              <>
+                <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-hide">
                     {messages.map((m, i) => (
                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] p-5 rounded-2xl leading-relaxed shadow-sm ${m.role === 'user' ? 'bg-violet-600 text-white rounded-tr-none' : 'bg-gray-100 dark:bg-dark-700 text-slate-800 dark:text-gray-200 rounded-tl-none'}`}>
-                                <p className="whitespace-pre-wrap">{m.content}</p>
+                             <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm backdrop-blur-sm relative group ${m.role === 'user' ? 'bg-primary-600/90 text-white rounded-tr-none' : 'bg-white/60 dark:bg-dark-700/60 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600'}`}>
+                                {m.content}
+                                {m.role === 'model' && (
+                                    <button onClick={() => speakText(m.content)} className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-primary-500">
+                                        <Icons.Speaker />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
-                    {loading && (
-                        <div className="flex justify-start">
-                             <TypingIndicator />
-                        </div>
-                    )}
+                    {loading && <TypingIndicator />}
                     <div ref={scrollRef} />
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-dark-900 border-t border-gray-200 dark:border-gray-700 flex space-x-2">
-                     <input
-                        type="text"
-                        className="flex-grow bg-white dark:bg-dark-800 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-white placeholder-gray-400"
-                        placeholder="Responda aqui..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    />
-                    <button onClick={handleSend} disabled={loading} className="bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
-                        <Icons.Send />
-                    </button>
+                <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+                    <div className="flex space-x-2">
+                        <input 
+                            type="text" 
+                            className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400 backdrop-blur-sm"
+                            placeholder="Responda aqui..."
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSend()}
+                        />
+                        <button onClick={handleSend} disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
+                            <Icons.Send />
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </div>
-    );
-};
+              </>
+          ) : (
+              <div className="p-10 flex flex-col items-center justify-center h-full text-center space-y-6 animate-fade-in">
+                  <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-full flex items-center justify-center text-white shadow-xl mb-4">
+                      <Icons.Sparkles />
+                  </div>
+                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white">{report.area}</h3>
+                  <p className="text-gray-600 dark:text-gray-300 max-w-lg text-lg leading-relaxed">{report.description}</p>
+                  
+                  <div className="w-full max-w-md bg-white/50 dark:bg-dark-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
+                      <h4 className="font-bold text-sm uppercase text-gray-500 mb-4">Carreiras Sugeridas</h4>
+                      <div className="space-y-2">
+                          {report.careers.map((c: string, i: number) => (
+                              <div key={i} className="bg-white/80 dark:bg-dark-800/80 p-3 rounded-lg shadow-sm font-medium text-slate-800 dark:text-white">
+                                  {c}
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+                  <button onClick={() => { setReport(null); setMessages([]); hasStarted.current = false; onBack(); }} className="mt-8 text-primary-600 hover:underline">Voltar ao Início</button>
+              </div>
+          )}
+      </div>
+    </div>
+  )
+}
 
 const root = createRoot(document.getElementById("root")!);
 root.render(<App />);
