@@ -23,15 +23,47 @@ const Icons = {
   Briefcase: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
   Upload: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
   Speaker: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>,
-  Sparkles: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+  Sparkles: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+  Clock: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  FileText: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 };
 
-const RECRUITER_AVATARS = [
-    "https://cdn3.iconfinder.com/data/icons/avatars-9/145/Avatar_Dog-512.png",
-    "https://cdn-icons-png.flaticon.com/512/4775/4775486.png",
-    "https://w7.pngwing.com/pngs/867/134/png-transparent-giant-panda-dog-cat-avatar-fox-animal-tag-mammal-animals-carnivoran-thumbnail.png",
-    "https://i.pinimg.com/474x/05/26/5f/05265f5c35a8f6d0f38e712f1ceefca7.jpg",
-    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJ63nCVJWfJNQ-FYePohFXqSDQ0qk6sAIdtA&s"
+const RECRUITER_PROFILES = [
+    {
+        name: "Mariana Costa",
+        role: "Talent Acquisition Lead",
+        voice: "Kore",
+        style: "Entusiasta, acolhedora, foca em cultura e soft skills. Fala com energia.",
+        avatar: "https://i.pravatar.cc/300?img=5"
+    },
+    {
+        name: "Carlos Mendes",
+        role: "Diretor Técnico",
+        voice: "Fenrir",
+        style: "Sério, direto, foca em desafios técnicos e resolução de problemas. Voz grave e calma.",
+        avatar: "https://i.pravatar.cc/300?img=11"
+    },
+    {
+        name: "Fernanda Lima",
+        role: "HR Business Partner",
+        voice: "Aoede",
+        style: "Profissional, polida, articula bem as palavras. Foca em carreira e ambição.",
+        avatar: "https://i.pravatar.cc/300?img=9"
+    },
+    {
+        name: "Roberto Almeida",
+        role: "Gerente de Operações",
+        voice: "Charon",
+        style: "Pragmático, experiente, paternal. Gosta de ouvir histórias de superação.",
+        avatar: "https://i.pravatar.cc/300?img=3"
+    },
+    {
+        name: "Julia Silva",
+        role: "Líder de Design e Inovação",
+        voice: "Puck",
+        style: "Criativa, curiosa, informal. Faz perguntas fora da caixa.",
+        avatar: "https://i.pravatar.cc/300?img=1"
+    }
 ];
 
 // --- API & Types ---
@@ -47,20 +79,22 @@ const SoundFX = {
     }
   },
   playTone: (freq: number, type: OscillatorType, duration: number, vol = 0.1) => {
-    if (!SoundFX.ctx) SoundFX.init();
-    const ctx = SoundFX.ctx!;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    gain.gain.setValueAtTime(vol, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
+    try {
+        if (!SoundFX.ctx) SoundFX.init();
+        const ctx = SoundFX.ctx!;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    } catch(e) {}
   },
   playConnect: () => {
      SoundFX.playTone(440, 'sine', 0.1);
@@ -114,11 +148,26 @@ const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Priority: Google Português do Brasil -> Any pt-BR -> Default
+        const voices = window.speechSynthesis.getVoices();
+        const ptVoice = voices.find(v => v.name.includes("Google Português do Brasil")) || 
+                        voices.find(v => v.lang === "pt-BR");
+        
+        if (ptVoice) {
+            utterance.voice = ptVoice;
+        }
         utterance.lang = 'pt-BR';
-        utterance.rate = 1.1;
+        utterance.rate = 1.05; // Natural pace
+        utterance.pitch = 1.0;
         window.speechSynthesis.speak(utterance);
     }
 };
+
+// Ensure voices are loaded for Chrome
+if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => {};
+}
 
 // --- Helper Components ---
 
@@ -237,14 +286,14 @@ const Home = ({ setView }: { setView: (v: any) => void }) => (
     <div className="grid md:grid-cols-3 gap-8">
       <DashboardCard
         title="Construtor de Currículo"
-        desc="Crie um CV profissional com auxílio de um consultor especialista."
+        desc="Crie um CV ATS-friendly com auxílio de um consultor especialista."
         icon={<Icons.Resume />}
         color="bg-gradient-to-br from-blue-500 to-blue-600"
         onClick={() => setView('resume')}
       />
       <DashboardCard
         title="Simulador de Entrevista"
-        desc="Pratique com um entrevistador de voz realista em tempo real."
+        desc="Pratique com um recrutador realista em tempo real (Áudio)."
         icon={<Icons.Microphone />}
         color="bg-gradient-to-br from-emerald-500 to-emerald-600"
         onClick={() => setView('interview')}
@@ -285,6 +334,62 @@ const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete:
       setStep('editor');
   }
 
+  // Visual Previews for Templates
+  const renderTemplatePreview = (type: TemplateType) => {
+      switch(type) {
+          case 'corporate':
+              return (
+                  <div className="w-full h-32 bg-white border border-gray-200 p-2 flex flex-col gap-1 rounded-sm shadow-sm opacity-80 overflow-hidden">
+                      <div className="h-4 bg-gray-800 w-full mb-1"></div>
+                      <div className="h-2 bg-gray-300 w-3/4"></div>
+                      <div className="flex gap-1 mt-1">
+                          <div className="w-2/3 flex flex-col gap-1">
+                              <div className="h-2 bg-gray-300 w-full"></div>
+                              <div className="h-1 bg-gray-200 w-full"></div>
+                              <div className="h-1 bg-gray-200 w-full"></div>
+                              <div className="h-2 bg-gray-300 w-full mt-1"></div>
+                              <div className="h-1 bg-gray-200 w-full"></div>
+                          </div>
+                          <div className="w-1/3 bg-gray-100 p-1 flex flex-col gap-1">
+                               <div className="h-2 bg-gray-300 w-full"></div>
+                               <div className="h-1 bg-gray-200 w-full"></div>
+                          </div>
+                      </div>
+                  </div>
+              )
+           case 'creative':
+              return (
+                  <div className="w-full h-32 bg-white border border-gray-200 flex rounded-sm shadow-sm opacity-80 overflow-hidden">
+                       <div className="w-1/3 bg-gray-800 h-full p-1 flex flex-col gap-1">
+                           <div className="h-4 w-full bg-gray-600 rounded-full mb-2"></div>
+                           <div className="h-1 w-full bg-gray-500"></div>
+                           <div className="h-1 w-full bg-gray-500"></div>
+                       </div>
+                       <div className="w-2/3 p-2 flex flex-col gap-1">
+                           <div className="h-2 bg-gray-300 w-1/2 mb-1"></div>
+                           <div className="h-1 bg-gray-200 w-full"></div>
+                           <div className="h-1 bg-gray-200 w-full"></div>
+                           <div className="h-2 bg-gray-300 w-1/2 mt-1"></div>
+                           <div className="h-1 bg-gray-200 w-full"></div>
+                           <div className="flex gap-1 mt-1"><div className="w-2 h-2 rounded-full bg-gray-300"></div><div className="w-2 h-2 rounded-full bg-gray-300"></div></div>
+                       </div>
+                  </div>
+              )
+            case 'academic':
+                return (
+                  <div className="w-full h-32 bg-white border border-gray-200 p-2 flex flex-col gap-1 rounded-sm shadow-sm opacity-80 overflow-hidden text-[4px] font-serif">
+                      <div className="text-center font-bold">NOME DO CANDIDATO</div>
+                      <div className="text-center text-[3px]">email@email.com • 1234-5678</div>
+                      <div className="border-b border-black mt-1"></div>
+                      <div className="font-bold mt-1">RESUMO</div>
+                      <div className="bg-gray-200 h-2 w-full"></div>
+                      <div className="font-bold mt-1">EDUCAÇÃO</div>
+                      <div className="flex justify-between"><div className="bg-gray-200 h-1 w-10"></div><div className="bg-gray-200 h-1 w-4"></div></div>
+                  </div>
+              )
+      }
+  }
+
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col">
       <div className="flex items-center space-x-2 mb-4">
@@ -296,25 +401,27 @@ const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete:
         <div className="flex-grow flex flex-col items-center justify-center space-y-8 animate-fade-in overflow-y-auto p-4">
           <div className="text-center space-y-2">
             <h3 className="text-xl text-gray-600 dark:text-gray-300">Escolha o estilo do seu currículo</h3>
-            <p className="text-sm text-gray-500">O consultor usará este modelo para guiar a entrevista.</p>
+            <p className="text-sm text-gray-500">Todos os modelos são otimizados para ATS (Sistemas de Rastreamento de Candidatos).</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6 w-full max-w-4xl">
+          <div className="grid md:grid-cols-3 gap-6 w-full max-w-5xl">
             {[
-              { id: 'corporate', name: 'Corporativo', desc: 'Limpo, profissional, ideal para grandes empresas. Barras de progresso.', color: 'border-blue-500' },
-              { id: 'creative', name: 'Criativo', desc: 'Moderno, com design arrojado. Ideal para design/tech. Bolinhas de skill.', color: 'border-pink-500' },
-              { id: 'academic', name: 'Acadêmico', desc: 'Focado em texto e detalhes. Ideal para pesquisa e educação.', color: 'border-green-500' }
+              { id: 'corporate', name: 'Corporativo (ATS)', desc: 'Alta legibilidade. Estrutura clássica. Ideal para grandes empresas.', color: 'border-blue-500' },
+              { id: 'creative', name: 'Criativo Moderno', desc: 'Design arrojado com barra lateral. Ótimo para Tech e Design.', color: 'border-pink-500' },
+              { id: 'academic', name: 'Acadêmico/Pesquisa', desc: 'Focado em publicações e detalhes textuais. Fonte serifada.', color: 'border-green-500' }
             ].map((t) => (
               <button
                 key={t.id}
                 onClick={() => { setTemplate(t.id as TemplateType); setStep('chat'); }}
-                className={`p-6 bg-white/90 dark:bg-dark-800/90 backdrop-blur-sm border-2 ${template === t.id ? t.color : 'border-transparent'} hover:border-primary-500 rounded-xl shadow-lg transition-all text-left space-y-2`}
+                className={`p-6 bg-white/90 dark:bg-dark-800/90 backdrop-blur-sm border-2 ${template === t.id ? t.color : 'border-transparent'} hover:border-primary-500 rounded-xl shadow-lg transition-all text-left space-y-4 group`}
               >
-                <div className={`w-full h-32 bg-gray-100 dark:bg-gray-700/50 rounded-lg mb-4 flex items-center justify-center text-gray-400 font-semibold`}>
-                    Preview {t.name}
+                <div className="w-full rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 group-hover:shadow-md transition-shadow">
+                    {renderTemplatePreview(t.id as TemplateType)}
                 </div>
-                <h4 className="text-lg font-bold text-slate-800 dark:text-white">{t.name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t.desc}</p>
+                <div>
+                    <h4 className="text-lg font-bold text-slate-800 dark:text-white">{t.name}</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{t.desc}</p>
+                </div>
               </button>
             ))}
           </div>
@@ -388,10 +495,9 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
         setLoading(true);
         setTimeout(() => {
             if (initialContext) {
-                // If user provided context, parse it immediately
                 handleSend(initialContext, true);
             } else {
-                addMessage('model', "Olá! Sou seu consultor de carreira. Vamos montar um currículo incrível. Para começar, qual é o seu nome completo?");
+                addMessage('model', "Olá! Sou seu consultor especialista em currículos ATS. Vou te fazer perguntas rápidas para montar um perfil de destaque. Qual é o seu nome completo?");
                 setLoading(false);
             }
         }, 1000);
@@ -421,29 +527,33 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
     try {
       const history = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Consultor'}: ${m.content}`).join('\n');
       const prompt = `
-        Você é um Consultor Especialista em Carreira e Currículos, NÃO se identifique como IA.
-        Você está entrevistando o usuário para coletar dados para o currículo. O Template escolhido é: ${template}.
+        ATUE COMO UM ESPECIALISTA EM CURRÍCULOS E ATS (Applicant Tracking Systems).
+        Você está entrevistando o usuário. NÃO se identifique como IA, você é um consultor humano.
         
-        Dados atuais do currículo (JSON): ${JSON.stringify(resumeData)}
+        OBJETIVO: Preencher o JSON do currículo com linguagem otimizada para o mercado.
+        REGRAS DE ATS:
+        - Use verbos de ação fortes (Gerenciei, Desenvolvi, Liderei).
+        - Quantifique resultados sempre que possível.
+        - Use palavras-chave da indústria do usuário.
 
-        Histórico da conversa:
+        Dados atuais (JSON): ${JSON.stringify(resumeData)}
+        Histórico:
         ${history}
         ${isHiddenContext ? `CONTEXTO INICIAL DO USUÁRIO: ${text}` : `Usuário: ${text}`}
 
-        INSTRUÇÕES:
-        1. Analise a resposta do usuário.
-        2. Atualize o JSON do currículo se houver novas informações.
-        3. Formule a próxima pergunta (seja BREVE, direto e amigável).
-        4. FAÇA PERGUNTAS CURTAS. Ex: "E qual seu email?", "Onde você trabalhou antes?". Evite textos longos.
-        5. Se o usuário falar sobre uma área (ex: "sou dev"), sugira skills dessa área no widget.
-        6. Se pedir contatos, peça LinkedIn/GitHub/Email e use o widget de contato.
-        7. SE TIVER DADOS SUFICIENTES ou o usuário pedir para gerar, defina "completed": true.
+        INSTRUÇÕES DE INTERAÇÃO:
+        1. Analise a entrada. Atualize o JSON.
+        2. IMPORTANTE: Ao atualizar listas (experience, education, skills), envie a LISTA COMPLETA com os novos itens adicionados/modificados.
+        3. Formule a próxima pergunta. Seja BREVE e direto. Uma pergunta por vez.
+        4. Se o usuário der uma resposta curta (ex: "trabalhei na loja x"), peça detalhes: "Quais eram suas principais responsabilidades lá?".
+        5. Sugira Skills no widget baseado no cargo.
+        6. Quando tiver Nome, Email, Resumo (curto), 1 Experiência e 1 Formação, sugira finalizar.
 
-        FORMATO DE RESPOSTA (JSON APENAS):
+        RESPOSTA JSON APENAS:
         {
-          "message": "Sua resposta curta aqui.",
-          "quickReplies": ["Sugestão 1", "Sugestão 2"],
-          "updateResume": { ...partial resume data structure ... },
+          "message": "Texto da resposta (max 2 frases).",
+          "quickReplies": ["Sim", "Não", "Pular"],
+          "updateResume": { ...partial data structure (COMPLETE ARRAYS) ... },
           "widget": { "type": "skills" | "contact" | "none", "data": [] },
           "completed": boolean
         }
@@ -464,8 +574,12 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
                 const newData = { ...prev };
                 if (response.updateResume.personalInfo) newData.personalInfo = { ...newData.personalInfo, ...response.updateResume.personalInfo };
                 if (response.updateResume.summary) newData.summary = response.updateResume.summary;
-                if (response.updateResume.experience) newData.experience = [...newData.experience, ...response.updateResume.experience];
-                if (response.updateResume.education) newData.education = [...newData.education, ...response.updateResume.education];
+                
+                // CRITICAL: Replace arrays to avoid duplicates
+                if (response.updateResume.experience) newData.experience = response.updateResume.experience;
+                if (response.updateResume.education) newData.education = response.updateResume.education;
+                if (response.updateResume.skills && response.updateResume.skills.length > 0) newData.skills = response.updateResume.skills;
+                
                 return newData;
             });
         }
@@ -489,10 +603,15 @@ const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialCont
   // --- Widgets ---
 
   const handleSkillsUpdate = (newSkills: Skill[]) => {
-      setResumeData((prev: any) => ({
-          ...prev,
-          skills: [...prev.skills.filter((s: Skill) => !newSkills.find(ns => ns.name === s.name)), ...newSkills]
-      }));
+      setResumeData((prev: any) => {
+         // Merge unique skills
+         const existingNames = new Set(prev.skills.map((s: Skill) => s.name));
+         const uniqueNew = newSkills.filter(s => !existingNames.has(s.name));
+         return {
+             ...prev,
+             skills: [...prev.skills, ...uniqueNew]
+         }
+      });
   };
 
   const handleContactUpdate = (info: any) => {
@@ -914,14 +1033,18 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
   const [uploading, setUploading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [finalReport, setFinalReport] = useState<any>(null);
-  const [avatarUrl, setAvatarUrl] = useState(RECRUITER_AVATARS[0]);
+  const [selectedProfile, setSelectedProfile] = useState(RECRUITER_PROFILES[0]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const sessionRef = useRef<any>(null);
   const [transcript, setTranscript] = useState<string[]>([]);
   const currentTranscriptRef = useRef<string[]>([]);
+  const [duration, setDuration] = useState(0); // in seconds
+  const durationRef = useRef(0);
 
   // We keep a reference to stop audio context cleanly
   const audioContextRef = useRef<AudioContext | null>(null);
+  // Track audio queue to delay ending
+  const isAudioQueuePlayingRef = useRef(false);
 
   const searchJobs = async () => {
       setLoadingJobs(true);
@@ -1034,17 +1157,23 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
           SoundFX.playPop();
           const text = `Nome: ${globalResume.personalInfo.fullName}
           Resumo: ${globalResume.summary}
-          Experiência: ${globalResume.experience.map(e => `${e.role} em ${e.company} (${e.duration})`).join('; ')}
-          Skills: ${globalResume.skills.map(s => s.name).join(', ')}`;
+          Experiência: ${globalResume.experience.map((e: any) => `${e.role} em ${e.company} (${e.duration})`).join('; ')}
+          Skills: ${globalResume.skills.map((s: any) => s.name).join(', ')}`;
           setResumeText(text);
       }
   }
 
   const endSession = async () => {
-    SoundFX.playDisconnect();
-    if (sessionRef.current) {
-        // Disconnect
+    // Graceful exit: Wait for audio queue to finish if speaking
+    if (isAudioQueuePlayingRef.current) {
+        // Simple polling wait (max 5 seconds)
+        for(let i=0; i<50; i++) {
+            if(!isAudioQueuePlayingRef.current) break;
+            await new Promise(r => setTimeout(r, 100));
+        }
     }
+    
+    SoundFX.playDisconnect();
     setConnected(false);
     if(audioContextRef.current) audioContextRef.current.close();
     
@@ -1066,10 +1195,16 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
         Transcrições:
         ${transcriptText}
 
+        Avalie com critérios rigorosos:
+        1. Comunicação (Clareza, articulação, confiança).
+        2. Conteúdo Técnico (Alinhamento com a vaga).
+        3. Fit Cultural (Postura, valores).
+
         Gere um relatório JSON:
         {
-            "score": number (0-10),
-            "summary": "Resumo geral do desempenho",
+            "score": number (0-10, seja criterioso),
+            "summary": "Feedback direto e construtivo, como se fosse um e-mail de retorno do RH.",
+            "scores": { "communication": 0-10, "technical": 0-10, "cultural": 0-10 },
             "strengths": ["Ponto forte 1", "Ponto forte 2"],
             "weaknesses": ["Ponto a melhorar 1", "Ponto a melhorar 2"],
             "tips": ["Dica prática 1", "Dica prática 2"]
@@ -1090,13 +1225,55 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
       }
   }
 
+  useEffect(() => {
+    let interval: any;
+    if (connected && viewMode === 'live') {
+        interval = setInterval(() => {
+            setDuration(prev => {
+                const next = prev + 1;
+                durationRef.current = next;
+                
+                // Prompt to wrap up at 3 minutes (180s)
+                if (next === 180 && sessionRef.current) {
+                    sessionRef.current.sendRealtimeInput({
+                        content: {
+                            role: "user",
+                            parts: [{ text: "SYSTEM: Estamos chegando a 3 minutos. Comece a encaminhar para o encerramento, faça a última pergunta." }]
+                        }
+                    });
+                }
+                
+                // Hard stop at 5 minutes (300s)
+                if (next >= 300) {
+                     endSession();
+                }
+                
+                return next;
+            });
+        }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [connected, viewMode]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
   const startInterview = async () => {
     if (!selectedJob) return;
     SoundFX.playConnect();
     setViewMode('live');
-    setAvatarUrl(RECRUITER_AVATARS[Math.floor(Math.random() * RECRUITER_AVATARS.length)]);
+    
+    // Select random profile
+    const profile = RECRUITER_PROFILES[Math.floor(Math.random() * RECRUITER_PROFILES.length)];
+    setSelectedProfile(profile);
+
     setTranscript([]);
     currentTranscriptRef.current = [];
+    setDuration(0);
+    durationRef.current = 0;
 
     const client = new GoogleGenAI({ apiKey: API_KEY });
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -1111,7 +1288,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
 
     const endInterviewTool: FunctionDeclaration = {
         name: "endInterview",
-        description: "Encerra a entrevista quando você (o recrutador) tiver informações suficientes ou o tempo acabar.",
+        description: "Encerra a entrevista. Chame APÓS se despedir verbalmente.",
         parameters: { type: Type.OBJECT, properties: {} }
     };
 
@@ -1119,40 +1296,43 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
       model: 'gemini-2.5-flash-native-audio-preview-09-2025',
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.voice } } },
         tools: [{ functionDeclarations: [endInterviewTool] }],
         inputAudioTranscription: {},
         outputAudioTranscription: {},
         systemInstruction: `
-          CONTEXTO:
-          Você é um Recrutador Sênior da empresa ${selectedJob.company}.
-          Você está entrevistando um candidato.
-          
-          VAGA: ${selectedJob.title}
-          DESCRIÇÃO DA VAGA: ${selectedJob.description}
-          REQUISITOS: ${selectedJob.requirements.join(', ')}
+          PERSONA:
+          Você é ${profile.name}, ${profile.role} na empresa ${selectedJob.company}.
+          ESTILO DE FALA: ${profile.style}
+          Você está entrevistando o candidato para a vaga de ${selectedJob.title}.
 
-          DADOS DO CANDIDATO (Extraídos do Arquivo):
+          CONTEXTO DA VAGA:
+          Descrição: ${selectedJob.description}
+          Requisitos: ${selectedJob.requirements.join(', ')}
+
+          CANDIDATO:
           ${resumeText}
 
-          SUA MISSÃO:
-          1. INÍCIO IMEDIATO: Assim que receber a mensagem "START", FALE PRIMEIRO. Dê "Bom dia/Boa tarde", apresente-se como recrutador da ${selectedJob.company} e cite algo específico do currículo dele para mostrar que você leu.
-          2. Conduza uma entrevista realista de 5 a 10 minutos (simulado).
-          3. Faça perguntas sobre a experiência dele baseada no currículo e como se conecta com a vaga.
-          4. Seja profissional mas cordial.
-          5. ENCERRAMENTO: Quando você tiver feito 3 ou 4 perguntas relevantes e ouvido as respostas, ou se sentir que já tem dados para um relatório, diga: "Ótimo, obrigado pelo seu tempo. Entraremos em contato em breve." e CHAME A FUNÇÃO 'endInterview'.
+          ROTEIRO:
+          1. INÍCIO: Apresente-se (${profile.name}), mencione a empresa ${selectedJob.company} e dê as boas-vindas.
+          2. MEIO: Faça perguntas baseadas no currículo e na vaga. Avalie soft skills e hard skills.
+          3. FIM: Quando tiver informações suficientes ou o tempo estiver acabando, agradeça o tempo do candidato, diga que entrarão em contato e despeça-se.
+          
+          IMPORTANTE - ENCERRAMENTO:
+          Sempre FALE a despedida ("Obrigado, tchau") PRIMEIRO.
+          SÓ DEPOIS de falar, chame a função "endInterview".
         `,
       },
       callbacks: {
         onopen: () => {
             setConnected(true);
             
-            // Trigger the model to start immediately with a hidden message
+            // Force start immediately
             setTimeout(() => {
                 session.sendRealtimeInput({
                     content: {
                         role: "user",
-                        parts: [{ text: "O candidato entrou na sala. Inicie a entrevista agora se apresentando." }]
+                        parts: [{ text: "O candidato conectou. Inicie a entrevista." }]
                     }
                 });
             }, 500);
@@ -1195,7 +1375,8 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                                  response: { result: 'ok' }
                              }
                          });
-                         endSession();
+                         // Delay slightly to ensure "Goodbye" audio plays
+                         setTimeout(() => endSession(), 2000);
                          return;
                      }
                  }
@@ -1205,6 +1386,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
              const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
              if (audioData) {
                  setIsSpeaking(true);
+                 isAudioQueuePlayingRef.current = true;
                  // Decode Base64 manually to Float32Array
                  const binaryString = atob(audioData);
                  const len = binaryString.length;
@@ -1231,23 +1413,24 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                  nextStartTime = start + buffer.duration;
                  
                  source.onended = () => {
-                     if (outputAudioContext.currentTime >= nextStartTime - 0.1) setIsSpeaking(false);
+                     if (outputAudioContext.currentTime >= nextStartTime - 0.1) {
+                         setIsSpeaking(false);
+                         isAudioQueuePlayingRef.current = false;
+                     }
                  }
                  sources.add(source);
              }
 
-             // Collect Transcription for report
+             // Collect Transcription for report (Hide from UI, store in ref)
              const userT = msg.serverContent?.inputTranscription?.text;
              const modelT = msg.serverContent?.outputTranscription?.text;
              
              if (userT) {
                  const line = `Candidato: ${userT}`;
-                 setTranscript(prev => [...prev, line]);
                  currentTranscriptRef.current.push(line);
              }
              if (modelT) {
-                 const line = `Recrutador: ${modelT}`;
-                 setTranscript(prev => [...prev, line]);
+                 const line = `${profile.name}: ${modelT}`;
                  currentTranscriptRef.current.push(line);
              }
         },
@@ -1338,128 +1521,137 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                          <span className="text-sm font-medium">{uploading ? "Analisando com IA..." : "Upload Arquivo"}</span>
                          <span className="text-xs text-gray-400">PDF, DOCX, TXT, IMG</span>
                      </div>
-                     <button onClick={handleImportResume} disabled={!globalResume} className="border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 hover:text-primary-600 transition-colors disabled:opacity-50 hover:bg-white/50 dark:hover:bg-dark-700/50">
+                     <button onClick={handleImportResume} disabled={!globalResume} className="border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 hover:bg-white/50 dark:hover:bg-dark-700/50 transition-colors disabled:opacity-50">
                          <Icons.Resume />
                          <span className="text-sm font-medium">Importar do Construtor</span>
+                         <span className="text-xs text-gray-400">Usar dados gerados anteriormente</span>
                      </button>
                  </div>
-
+                 
                  {resumeText && (
-                    <div className="w-full animate-fade-in text-left">
-                        <div className="flex items-center gap-2 text-green-600 mb-2 font-medium">
-                            <Icons.Check /> <span>Currículo processado com sucesso</span>
-                        </div>
-                         <textarea 
-                            className="w-full h-32 p-3 text-sm border rounded-lg bg-gray-50/50 dark:bg-dark-900/50 dark:border-gray-700 dark:text-white backdrop-blur-sm" 
-                            placeholder="O texto do seu currículo aparecerá aqui..." 
-                            value={resumeText} 
-                            readOnly 
-                        />
-                    </div>
+                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-300 w-full animate-fade-in">
+                         <Icons.Check />
+                         <span className="text-sm font-medium">Currículo carregado com sucesso! Pronto para a entrevista.</span>
+                     </div>
                  )}
 
-                 <button onClick={startInterview} disabled={!resumeText} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-lg font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
+                 <button onClick={startInterview} disabled={!resumeText} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
                      <Icons.Microphone /> Iniciar Entrevista Agora
                  </button>
              </div>
         )}
 
         {viewMode === 'live' && (
-            <div className="flex-grow flex flex-col items-center justify-center space-y-8 bg-gradient-to-b from-gray-900/90 to-black/90 backdrop-blur-xl rounded-2xl relative overflow-hidden p-8 text-white shadow-2xl animate-fade-in border border-white/10">
-                {/* Background Pulse Animation */}
-                {isSpeaking && <div className="absolute inset-0 bg-primary-500/20 animate-pulse duration-1000"></div>}
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                
-                <div className="relative z-10 flex flex-col items-center space-y-6">
-                    <div className={`relative w-48 h-48 rounded-full border-4 ${isSpeaking ? 'border-green-400 shadow-[0_0_50px_rgba(74,222,128,0.6)] scale-105' : 'border-gray-600'} transition-all duration-300`}>
-                        <img src={avatarUrl} alt="Recruiter" className="w-full h-full object-cover rounded-full" />
-                        {isSpeaking && (
-                            <div className="absolute -bottom-4 right-1/2 translate-x-1/2 bg-green-500 text-sm font-bold px-3 py-1 rounded-full animate-bounce shadow-lg">
-                                FALANDO...
-                            </div>
-                        )}
-                    </div>
-                    <div className="text-center">
-                        <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-white">Recrutador</h3>
-                        <p className="text-blue-300 font-medium">{selectedJob?.company}</p>
-                    </div>
-                </div>
+             <div className="flex-grow flex flex-col items-center justify-center relative bg-gradient-to-b from-gray-900 to-black rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
+                {/* Timer */}
+                 <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-white font-mono text-sm border border-white/10 flex items-center gap-2 z-20">
+                     <span className={`w-2 h-2 rounded-full ${duration > 180 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
+                     {formatTime(duration)}
+                 </div>
 
-                <div className="w-full max-w-2xl bg-white/10 backdrop-blur-md border border-white/10 p-6 rounded-2xl text-center h-48 overflow-y-auto flex flex-col justify-end shadow-inner">
-                    <div className="space-y-3 text-sm">
-                        {transcript.slice(-3).map((line, i) => (
-                             <p key={i} className={`py-1 px-3 rounded-lg inline-block ${line.startsWith('Recrutador') ? 'bg-blue-900/40 text-blue-200 self-start' : 'bg-gray-700/40 text-gray-200 self-end'}`}>{line}</p>
-                        ))}
-                    </div>
-                    <p className="text-gray-400 italic text-xs mt-4 border-t border-white/10 pt-2 flex items-center justify-center gap-2">
-                        {isSpeaking ? <span className="flex gap-1"><span className="w-1 h-1 bg-green-400 rounded-full animate-ping"></span> Ouvindo...</span> : "Sua vez de falar..."}
-                    </p>
-                </div>
+                 <div className="relative z-10 flex flex-col items-center space-y-8 p-10">
+                     <div className="relative">
+                         {/* Pulse Ring */}
+                         <div className={`absolute inset-0 rounded-full bg-primary-500 blur-xl opacity-20 scale-150 transition-all duration-300 ${isSpeaking ? 'scale-[2.0] opacity-40' : ''}`}></div>
+                         
+                         <div className={`w-40 h-40 rounded-full border-4 ${isSpeaking ? 'border-primary-500 shadow-[0_0_30px_rgba(14,165,233,0.6)]' : 'border-gray-700'} overflow-hidden transition-all duration-300 relative bg-gray-900`}>
+                             <img src={selectedProfile.avatar} alt="Recruiter" className="w-full h-full object-cover" />
+                         </div>
+                     </div>
+                     
+                     <div className="text-center space-y-2">
+                         <h3 className="text-3xl font-bold text-white tracking-tight">{selectedProfile.name}</h3>
+                         <div className="flex flex-col text-gray-300 text-sm">
+                             <span className="font-semibold text-primary-400">{selectedProfile.role}</span>
+                             <span>{selectedJob?.company}</span>
+                         </div>
+                         <p className="text-blue-300/60 text-xs mt-2 animate-pulse font-mono tracking-widest uppercase">{isSpeaking ? "FALANDO" : "OUVINDO"}</p>
+                     </div>
+                 </div>
 
-                <button onClick={endSession} className="bg-red-600/90 hover:bg-red-700 text-white px-10 py-4 rounded-full font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-all backdrop-blur-sm border border-red-500/50">
-                    <Icons.Stop /> Encerrar Chamada
-                </button>
-            </div>
+                 {/* Waveform Visualization (Fake CSS) */}
+                 <div className="absolute bottom-0 left-0 right-0 h-32 flex items-end justify-center space-x-1 pb-8 opacity-50">
+                     {[...Array(20)].map((_, i) => (
+                         <div key={i} className="w-2 bg-primary-500 rounded-t-full transition-all duration-100" style={{ height: isSpeaking ? `${Math.random() * 80 + 20}%` : '10%' }}></div>
+                     ))}
+                 </div>
+
+                 <button onClick={() => endSession()} className="absolute bottom-8 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110 z-20 group">
+                     <Icons.Stop />
+                     <span className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Encerrar Chamada</span>
+                 </button>
+             </div>
         )}
 
-        {viewMode === 'report' && (
-            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-8 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 space-y-6 animate-fade-in">
-                <h3 className="text-2xl font-bold text-center mb-6">Feedback da Entrevista</h3>
-                
-                {!finalReport ? (
-                    <div className="flex flex-col items-center py-10 space-y-4">
-                        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-gray-500">Gerando relatório de performance com IA...</p>
+        {viewMode === 'report' && finalReport && (
+            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-8 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 space-y-8 animate-fade-in overflow-y-auto">
+                <div className="text-center space-y-2">
+                    <div className="inline-block p-4 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-2">
+                         <span className="text-5xl font-black">{finalReport.score}</span><span className="text-xl">/10</span>
                     </div>
-                ) : (
-                    <div className="space-y-8">
-                        <div className="flex justify-center">
-                            <div className="w-32 h-32 rounded-full border-8 border-primary-500 flex items-center justify-center flex-col shadow-[0_0_20px_rgba(14,165,233,0.3)] bg-white dark:bg-dark-900">
-                                <span className="text-4xl font-black text-primary-600">{finalReport.score}</span>
-                                <span className="text-xs uppercase font-bold text-gray-400">Nota / 10</span>
-                            </div>
-                        </div>
+                    <h3 className="text-2xl font-bold text-slate-800 dark:text-white">Análise de Desempenho</h3>
+                    <p className="text-gray-600 dark:text-gray-300 italic">"{finalReport.summary}"</p>
+                </div>
 
-                        <div className="bg-blue-50/50 dark:bg-dark-900/50 p-6 rounded-xl border border-blue-100 dark:border-gray-700 backdrop-blur-sm">
-                            <h4 className="font-bold text-lg mb-2 text-blue-800 dark:text-blue-300">Resumo</h4>
-                            <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{finalReport.summary}</p>
+                {finalReport.scores && (
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
+                            <div className="text-2xl font-bold text-primary-600">{finalReport.scores.communication}</div>
+                            <div className="text-xs text-gray-500 uppercase">Comunicação</div>
                         </div>
-
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                                <h4 className="font-bold text-green-600 flex items-center gap-2"><Icons.Check /> Pontos Fortes</h4>
-                                <ul className="space-y-2">
-                                    {finalReport.strengths.map((s:string, i:number) => (
-                                        <li key={i} className="bg-green-50/50 dark:bg-green-900/20 p-3 rounded-lg text-sm text-green-800 dark:text-green-200 border border-green-100 dark:border-green-900">{s}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div className="space-y-3">
-                                <h4 className="font-bold text-red-500 flex items-center gap-2"><Icons.Trash /> Pontos a Melhorar</h4>
-                                <ul className="space-y-2">
-                                    {finalReport.weaknesses.map((s:string, i:number) => (
-                                        <li key={i} className="bg-red-50/50 dark:bg-red-900/20 p-3 rounded-lg text-sm text-red-800 dark:text-red-200 border border-red-100 dark:border-red-900">{s}</li>
-                                    ))}
-                                </ul>
-                            </div>
+                        <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
+                             <div className="text-2xl font-bold text-primary-600">{finalReport.scores.technical}</div>
+                             <div className="text-xs text-gray-500 uppercase">Técnica</div>
                         </div>
-
-                        <div>
-                             <h4 className="font-bold text-purple-600 mb-3 flex items-center gap-2"><Icons.Brain /> Dicas do Especialista</h4>
-                             <div className="grid gap-3">
-                                {finalReport.tips.map((s:string, i:number) => (
-                                    <div key={i} className="p-3 bg-gray-50/50 dark:bg-dark-900/50 border-l-4 border-purple-500 text-gray-700 dark:text-gray-300 text-sm backdrop-blur-sm">
-                                        {s}
-                                    </div>
-                                ))}
-                             </div>
+                         <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
+                             <div className="text-2xl font-bold text-primary-600">{finalReport.scores.cultural}</div>
+                             <div className="text-xs text-gray-500 uppercase">Fit Cultural</div>
                         </div>
-                        
-                        <button onClick={() => setViewMode('search')} className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors shadow-lg">
-                            Nova Entrevista
-                        </button>
                     </div>
                 )}
+
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-xl border border-green-100 dark:border-green-800">
+                        <h4 className="font-bold text-green-800 dark:text-green-300 mb-4 flex items-center gap-2"><Icons.Check /> Pontos Fortes</h4>
+                        <ul className="space-y-2">
+                            {finalReport.strengths.map((s: string, i: number) => (
+                                <li key={i} className="text-sm text-green-700 dark:text-green-400">• {s}</li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-xl border border-red-100 dark:border-red-800">
+                        <h4 className="font-bold text-red-800 dark:text-red-300 mb-4 flex items-center gap-2"><Icons.Trash /> Pontos a Melhorar</h4>
+                        <ul className="space-y-2">
+                            {finalReport.weaknesses.map((w: string, i: number) => (
+                                <li key={i} className="text-sm text-red-700 dark:text-red-400">• {w}</li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl border border-blue-100 dark:border-blue-800">
+                     <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-4 flex items-center gap-2"><Icons.Sparkles /> Dicas do Especialista</h4>
+                     <ul className="space-y-2">
+                        {finalReport.tips.map((t: string, i: number) => (
+                            <li key={i} className="text-sm text-blue-700 dark:text-blue-400 flex gap-2">
+                                <span>💡</span> {t}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <details className="group border rounded-lg dark:border-gray-700 bg-white/50 dark:bg-dark-900/50">
+                    <summary className="p-4 cursor-pointer font-bold text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Ver Transcrição Completa</summary>
+                    <div className="p-4 pt-0 text-sm text-gray-600 dark:text-gray-400 space-y-2 max-h-60 overflow-y-auto font-mono">
+                        {currentTranscriptRef.current.map((line, i) => (
+                            <div key={i} className="border-b border-gray-100 dark:border-gray-800 py-1 last:border-0">{line}</div>
+                        ))}
+                    </div>
+                </details>
+                
+                <button onClick={() => setViewMode('search')} className="w-full py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    Nova Entrevista
+                </button>
             </div>
         )}
     </div>
@@ -1469,157 +1661,101 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
 // --- Vocational Test ---
 
 const VocationalTest = ({ onBack }: { onBack: () => void }) => {
-  const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<any>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const hasStarted = useRef(false);
+    const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([]);
+    const [input, setInput] = useState("");
+    const [loading, setLoading] = useState(false);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if(!hasStarted.current) {
-        hasStarted.current = true;
-        addMessage('model', "Olá! Sou seu psicólogo vocacional. Vamos conversar para descobrir qual área combina mais com você. Para começar, me conte um pouco sobre seus hobbies e o que você gosta de fazer no tempo livre.");
-    }
-  }, []);
-
-  const addMessage = (role: 'user' | 'model', content: string) => {
-    setMessages(prev => [...prev, { role, content }]);
-    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    if(role === 'model') {
-        speakText(content);
-        SoundFX.playPop();
-    }
-  };
-
-  const handleSend = async () => {
-      if (!input.trim()) return;
-      const userInput = input;
-      addMessage('user', userInput);
-      setInput("");
-      setLoading(true);
-
-      const client = new GoogleGenAI({ apiKey: API_KEY });
-      const history = messages.map(m => `${m.role}: ${m.content}`).join('\n');
-      
-      const prompt = `
-        Você é um psicólogo especialista em orientação vocacional.
-        CONVERSA ATUAL:
-        ${history}
-        User: ${userInput}
-
-        SEU OBJETIVO:
-        Fazer perguntas para entender a personalidade, interesses e aptidões do usuário.
-        Faça 1 pergunta por vez. Seja empático.
-        
-        CRITÉRIO DE PARADA:
-        Se você já tiver informações suficientes (após cerca de 5 ou 6 trocas), gere um JSON final com o resultado.
-        Caso contrário, continue a conversa com uma pergunta de texto normal.
-
-        FORMATO DE RESPOSTA (JSON se for resultado, Texto puro se for pergunta):
-        Se for resultado:
-        {
-            "result": {
-                "area": "Nome da Área (ex: Tecnologia, Saúde)",
-                "description": "Por que essa área combina...",
-                "careers": ["Carreira 1", "Carreira 2", "Carreira 3"]
-            }
+    useEffect(() => {
+        if (messages.length === 0) {
+            SoundFX.playPop();
+            setMessages([{ role: 'model', content: "Olá! Sou seu orientador vocacional. Para começarmos a descobrir sua área ideal, me conte um pouco sobre o que você gosta de fazer no seu tempo livre?" }]);
         }
+    }, []);
+
+    const handleSend = async () => {
+        if (!input.trim()) return;
+        const newMsgs = [...messages, { role: 'user', content: input }];
+        setMessages(newMsgs as any);
+        setInput("");
+        setLoading(true);
+        SoundFX.playPop();
+
+        const client = new GoogleGenAI({ apiKey: API_KEY });
+        const history = newMsgs.map(m => `${m.role === 'user' ? 'Usuário' : 'Psicólogo'}: ${m.content}`).join('\n');
         
-        Se for pergunta: Apenas o texto da pergunta.
-      `;
+        const prompt = `
+            Você é um Orientador Vocacional experiente e empático. 
+            Conduza uma conversa para descobrir a carreira ideal do usuário.
+            
+            HISTÓRICO:
+            ${history}
 
-      try {
-          const res = await client.models.generateContent({
-              model: 'gemini-3-pro-preview',
-              contents: prompt,
-          });
-          
-          const text = res.text?.trim() || "";
-          
-          if (text.startsWith('{')) {
-              try {
-                  const json = JSON.parse(text);
-                  setReport(json.result);
-                  SoundFX.playPing();
-              } catch (e) {
-                   addMessage('model', text); 
-              }
-          } else {
-              addMessage('model', text);
-          }
-      } catch (e) {
-          addMessage('model', "Desculpe, tive um erro. Pode repetir?");
-      }
-      setLoading(false);
-  }
+            INSTRUÇÕES:
+            1. Faça perguntas investigativas sobre interesses, hobbies, matérias favoritas, o que não gosta.
+            2. Seja encorajador.
+            3. Analise as respostas para identificar padrões (ex: gosta de lógica -> TI/Engenharia; gosta de cuidar -> Saúde).
+            4. Se já tiver informações suficientes (após umas 5-6 trocas), apresente uma sugestão de 3 áreas com uma breve justificativa e encerre.
 
-  return (
-    <div className="h-[calc(100vh-140px)] flex flex-col">
-       <div className="flex items-center space-x-2 mb-4">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
-      </div>
+            Responda de forma conversacional e breve (max 3 parágrafos curtos).
+        `;
 
-      <div className="flex-grow flex flex-col bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 overflow-hidden relative">
-          {!report ? (
-              <>
-                <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-hide">
-                    {messages.map((m, i) => (
+        try {
+            const res = await client.models.generateContent({
+                model: 'gemini-3-pro-preview',
+                contents: prompt
+            });
+            const text = res.text || "Poderia reformular?";
+            setMessages(prev => [...prev, { role: 'model', content: text }]);
+            speakText(text);
+            SoundFX.playPop();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="h-[calc(100vh-140px)] flex flex-col max-w-4xl mx-auto">
+             <div className="flex items-center space-x-2 mb-4">
+                <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
+            </div>
+            
+            <div className="flex-grow bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 flex flex-col overflow-hidden">
+                <div className="flex-grow overflow-y-auto p-6 space-y-4">
+                     {messages.map((m, i) => (
                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                             <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm backdrop-blur-sm relative group ${m.role === 'user' ? 'bg-primary-600/90 text-white rounded-tr-none' : 'bg-white/60 dark:bg-dark-700/60 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600'}`}>
-                                {m.content}
-                                {m.role === 'model' && (
-                                    <button onClick={() => speakText(m.content)} className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-primary-500">
+                             <div className={`max-w-[80%] p-4 rounded-2xl relative group ${m.role === 'user' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-white/60 dark:bg-dark-700/60 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600'}`}>
+                                 {m.content}
+                                 {m.role === 'model' && (
+                                     <button onClick={() => speakText(m.content)} className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-primary-500">
                                         <Icons.Speaker />
                                     </button>
-                                )}
-                            </div>
+                                 )}
+                             </div>
                         </div>
                     ))}
-                    {loading && <TypingIndicator />}
+                    {loading && <div className="p-4"><TypingIndicator /></div>}
                     <div ref={scrollRef} />
                 </div>
-                <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-                    <div className="flex space-x-2">
-                        <input 
-                            type="text" 
-                            className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400 backdrop-blur-sm"
-                            placeholder="Responda aqui..."
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleSend()}
-                        />
-                        <button onClick={handleSend} disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
-                            <Icons.Send />
-                        </button>
-                    </div>
+                <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm flex gap-2">
+                    <input 
+                        type="text" 
+                        className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white placeholder-gray-400"
+                        placeholder="Digite sua resposta..."
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSend()}
+                    />
+                    <button onClick={handleSend} disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors shadow-lg">
+                        <Icons.Send />
+                    </button>
                 </div>
-              </>
-          ) : (
-              <div className="p-10 flex flex-col items-center justify-center h-full text-center space-y-6 animate-fade-in">
-                  <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-full flex items-center justify-center text-white shadow-xl mb-4">
-                      <Icons.Sparkles />
-                  </div>
-                  <h3 className="text-3xl font-bold text-slate-900 dark:text-white">{report.area}</h3>
-                  <p className="text-gray-600 dark:text-gray-300 max-w-lg text-lg leading-relaxed">{report.description}</p>
-                  
-                  <div className="w-full max-w-md bg-white/50 dark:bg-dark-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-700 backdrop-blur-sm">
-                      <h4 className="font-bold text-sm uppercase text-gray-500 mb-4">Carreiras Sugeridas</h4>
-                      <div className="space-y-2">
-                          {report.careers.map((c: string, i: number) => (
-                              <div key={i} className="bg-white/80 dark:bg-dark-800/80 p-3 rounded-lg shadow-sm font-medium text-slate-800 dark:text-white">
-                                  {c}
-                              </div>
-                          ))}
-                      </div>
-                  </div>
-                  <button onClick={() => { setReport(null); setMessages([]); hasStarted.current = false; onBack(); }} className="mt-8 text-primary-600 hover:underline">Voltar ao Início</button>
-              </div>
-          )}
-      </div>
-    </div>
-  )
+            </div>
+        </div>
+    );
 }
 
 const root = createRoot(document.getElementById("root")!);
