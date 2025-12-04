@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from "@google/genai";
@@ -1040,6 +1039,11 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
   const currentTranscriptRef = useRef<string[]>([]);
   const [duration, setDuration] = useState(0); // in seconds
   const durationRef = useRef(0);
+  
+  // Interview Configuration
+  const [durationOption, setDurationOption] = useState<'short' | 'medium' | 'long'>('medium');
+  const durationLimits = { short: 180, medium: 300, long: 600 };
+  const durationLabels = { short: "Curta (3 min)", medium: "Média (5 min)", long: "Longa (10 min)" };
 
   // We keep a reference to stop audio context cleanly
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -1162,6 +1166,11 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
           setResumeText(text);
       }
   }
+  
+  const handleStartWithoutResume = () => {
+      setResumeText(""); // Explicitly empty
+      startInterview();
+  }
 
   const endSession = async () => {
     // Graceful exit: Wait for audio queue to finish if speaking
@@ -1228,23 +1237,26 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
   useEffect(() => {
     let interval: any;
     if (connected && viewMode === 'live') {
+        const limit = durationLimits[durationOption];
+        const warningTime = limit - 30; // Warn 30s before end
+
         interval = setInterval(() => {
             setDuration(prev => {
                 const next = prev + 1;
                 durationRef.current = next;
                 
-                // Prompt to wrap up at 3 minutes (180s)
-                if (next === 180 && sessionRef.current) {
+                // Prompt to wrap up
+                if (next === warningTime && sessionRef.current) {
                     sessionRef.current.sendRealtimeInput({
                         content: {
                             role: "user",
-                            parts: [{ text: "SYSTEM: Estamos chegando a 3 minutos. Comece a encaminhar para o encerramento, faça a última pergunta." }]
+                            parts: [{ text: "SYSTEM: Estamos chegando ao fim do tempo. Comece a encaminhar para o encerramento, faça a última pergunta." }]
                         }
                     });
                 }
                 
-                // Hard stop at 5 minutes (300s)
-                if (next >= 300) {
+                // Hard stop
+                if (next >= limit) {
                      endSession();
                 }
                 
@@ -1253,7 +1265,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
         }, 1000);
     }
     return () => clearInterval(interval);
-  }, [connected, viewMode]);
+  }, [connected, viewMode, durationOption]);
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -1292,6 +1304,9 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
         parameters: { type: Type.OBJECT, properties: {} }
     };
 
+    const hasResume = !!resumeText;
+    const timeLimitMin = durationLimits[durationOption] / 60;
+
     const session = await client.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-09-2025',
       config: {
@@ -1305,17 +1320,17 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
           Você é ${profile.name}, ${profile.role} na empresa ${selectedJob.company}.
           ESTILO DE FALA: ${profile.style}
           Você está entrevistando o candidato para a vaga de ${selectedJob.title}.
+          TEMPO DA ENTREVISTA: Aprox ${timeLimitMin} minutos.
 
           CONTEXTO DA VAGA:
           Descrição: ${selectedJob.description}
           Requisitos: ${selectedJob.requirements.join(', ')}
 
-          CANDIDATO:
-          ${resumeText}
+          ${hasResume ? `CANDIDATO (Baseado no CV): ${resumeText}` : `CANDIDATO: Sem currículo prévio. Você deve fazer uma triagem completa (Screening).`}
 
           ROTEIRO:
           1. INÍCIO: Apresente-se (${profile.name}), mencione a empresa ${selectedJob.company} e dê as boas-vindas.
-          2. MEIO: Faça perguntas baseadas no currículo e na vaga. Avalie soft skills e hard skills.
+          ${hasResume ? '2. MEIO: Faça perguntas baseadas no currículo e na vaga. Avalie soft skills e hard skills.' : '2. MEIO: Pergunte sobre a trajetória, formação e experiências passadas do candidato para traçar o perfil dele, já que você não tem o CV.'}
           3. FIM: Quando tiver informações suficientes ou o tempo estiver acabando, agradeça o tempo do candidato, diga que entrarão em contato e despeça-se.
           
           IMPORTANTE - ENCERRAMENTO:
@@ -1462,7 +1477,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
         <div className="flex items-center justify-center space-x-6 mb-6">
              <Step active={viewMode === 'search'} completed={viewMode !== 'search'} number={1} label="Vaga" />
              <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full" />
-             <Step active={viewMode === 'resume_upload'} completed={viewMode === 'live' || viewMode === 'report'} number={2} label="Upload CV" />
+             <Step active={viewMode === 'resume_upload'} completed={viewMode === 'live' || viewMode === 'report'} number={2} label="Preparação" />
              <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full" />
              <Step active={viewMode === 'live'} completed={viewMode === 'report'} number={3} label="Entrevista" />
         </div>
@@ -1505,9 +1520,27 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                      <p className="text-sm text-blue-600 dark:text-blue-400">{selectedJob.company}</p>
                  </div>
                  
-                 <div className="space-y-2">
-                     <h3 className="text-xl font-bold">Adicione seu Currículo</h3>
-                     <p className="text-gray-500">O recrutador usará essas informações para fazer perguntas personalizadas.</p>
+                 {/* Duration Selection */}
+                 <div className="w-full">
+                     <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Duração da Entrevista</label>
+                     <div className="grid grid-cols-3 gap-3">
+                         {(['short', 'medium', 'long'] as const).map(opt => (
+                             <button 
+                                key={opt}
+                                onClick={() => setDurationOption(opt)}
+                                className={`py-2 rounded-lg text-sm font-medium transition-colors border ${durationOption === opt 
+                                    ? 'bg-primary-600 text-white border-primary-600' 
+                                    : 'bg-white dark:bg-dark-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-dark-600'}`}
+                             >
+                                 {durationLabels[opt]}
+                             </button>
+                         ))}
+                     </div>
+                 </div>
+
+                 <div className="space-y-2 pt-4">
+                     <h3 className="text-xl font-bold">Adicione seu Currículo (Opcional)</h3>
+                     <p className="text-gray-500 text-sm">Com o currículo, a entrevista será focada. Sem ele, será uma triagem de perfil.</p>
                  </div>
 
                  <div className="grid md:grid-cols-2 gap-6 w-full">
@@ -1521,11 +1554,17 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                          <span className="text-sm font-medium">{uploading ? "Analisando com IA..." : "Upload Arquivo"}</span>
                          <span className="text-xs text-gray-400">PDF, DOCX, TXT, IMG</span>
                      </div>
-                     <button onClick={handleImportResume} disabled={!globalResume} className="border-2 border-gray-300 dark:border-gray-600 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 hover:bg-white/50 dark:hover:bg-dark-700/50 transition-colors disabled:opacity-50">
-                         <Icons.Resume />
-                         <span className="text-sm font-medium">Importar do Construtor</span>
-                         <span className="text-xs text-gray-400">Usar dados gerados anteriormente</span>
-                     </button>
+                     <div className="flex flex-col gap-2">
+                         <button onClick={handleImportResume} disabled={!globalResume} className="flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 flex flex-col items-center justify-center space-y-2 hover:border-primary-500 hover:bg-white/50 dark:hover:bg-dark-700/50 transition-colors disabled:opacity-50">
+                             <Icons.Resume />
+                             <span className="text-sm font-medium">Importar do Construtor</span>
+                         </button>
+                          <button onClick={handleStartWithoutResume} className="flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 flex flex-col items-center justify-center space-y-2 hover:border-gray-500 hover:bg-gray-100 dark:hover:bg-dark-600 transition-colors">
+                             <Icons.Brain />
+                             <span className="text-sm font-medium">Pular Currículo</span>
+                             <span className="text-xs text-gray-400">Fazer triagem</span>
+                         </button>
+                     </div>
                  </div>
                  
                  {resumeText && (
@@ -1535,7 +1574,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                      </div>
                  )}
 
-                 <button onClick={startInterview} disabled={!resumeText} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
+                 <button onClick={startInterview} disabled={!resumeText && false} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
                      <Icons.Microphone /> Iniciar Entrevista Agora
                  </button>
              </div>
@@ -1545,7 +1584,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
              <div className="flex-grow flex flex-col items-center justify-center relative bg-gradient-to-b from-gray-900 to-black rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
                 {/* Timer */}
                  <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-white font-mono text-sm border border-white/10 flex items-center gap-2 z-20">
-                     <span className={`w-2 h-2 rounded-full ${duration > 180 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
+                     <span className={`w-2 h-2 rounded-full ${duration > durationLimits[durationOption] - 30 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
                      {formatTime(duration)}
                  </div>
 
@@ -1658,105 +1697,178 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
   );
 };
 
-// --- Vocational Test ---
-
 const VocationalTest = ({ onBack }: { onBack: () => void }) => {
-    const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([]);
-    const [input, setInput] = useState("");
-    const [loading, setLoading] = useState(false);
-    const scrollRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState<any>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [ai, setAi] = useState<GoogleGenAI | null>(null);
+  const [started, setStarted] = useState(false);
 
-    useEffect(() => {
-        if (messages.length === 0) {
-            SoundFX.playPop();
-            setMessages([{ role: 'model', content: "Olá! Sou seu orientador vocacional. Para começarmos a descobrir sua área ideal, me conte um pouco sobre o que você gosta de fazer no seu tempo livre?" }]);
-        }
-    }, []);
+  useEffect(() => {
+    const client = new GoogleGenAI({ apiKey: API_KEY });
+    setAi(client);
+    if (!started) {
+        setStarted(true);
+        addMessage('model', "Olá! Sou seu orientador vocacional com IA. Vamos descobrir qual carreira combina com seu perfil. Para começar, me conte: quais são seus principais hobbies e o que você mais gosta de estudar ou ler?");
+    }
+  }, []);
 
-    const handleSend = async () => {
-        if (!input.trim()) return;
-        const newMsgs = [...messages, { role: 'user', content: input }];
-        setMessages(newMsgs as any);
-        setInput("");
-        setLoading(true);
+  const addMessage = (role: 'user' | 'model', content: string) => {
+    setMessages(prev => [...prev, { role, content }]);
+    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    if(role === 'model') {
         SoundFX.playPop();
+    }
+  };
 
-        const client = new GoogleGenAI({ apiKey: API_KEY });
-        const history = newMsgs.map(m => `${m.role === 'user' ? 'Usuário' : 'Psicólogo'}: ${m.content}`).join('\n');
-        
-        const prompt = `
-            Você é um Orientador Vocacional experiente e empático. 
-            Conduza uma conversa para descobrir a carreira ideal do usuário.
-            
-            HISTÓRICO:
-            ${history}
+  const handleSend = async () => {
+      if (!input.trim() || !ai) return;
+      const userText = input;
+      setInput("");
+      addMessage('user', userText);
+      setLoading(true);
 
-            INSTRUÇÕES:
-            1. Faça perguntas investigativas sobre interesses, hobbies, matérias favoritas, o que não gosta.
-            2. Seja encorajador.
-            3. Analise as respostas para identificar padrões (ex: gosta de lógica -> TI/Engenharia; gosta de cuidar -> Saúde).
-            4. Se já tiver informações suficientes (após umas 5-6 trocas), apresente uma sugestão de 3 áreas com uma breve justificativa e encerre.
+      try {
+          const turnCount = messages.filter(m => m.role === 'user').length + 1;
+          const isFinalizing = turnCount >= 5;
 
-            Responda de forma conversacional e breve (max 3 parágrafos curtos).
-        `;
+          const history = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Psicólogo'}: ${m.content}`).join('\n');
+          
+          let prompt = "";
+          if (isFinalizing) {
+              prompt = `
+              Atue como um psicólogo vocacional experiente.
+              Baseado na conversa abaixo, gere um relatório JSON final com 3 sugestões de carreira.
+              
+              Conversa:
+              ${history}
+              Usuário: ${userText}
 
-        try {
-            const res = await client.models.generateContent({
-                model: 'gemini-3-pro-preview',
-                contents: prompt
-            });
-            const text = res.text || "Poderia reformular?";
-            setMessages(prev => [...prev, { role: 'model', content: text }]);
-            speakText(text);
-            SoundFX.playPop();
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
+              Formato JSON OBRIGATÓRIO:
+              {
+                  "analysis": "Análise psicológica breve do perfil...",
+                  "careers": [
+                      {"title": "Nome da Carreira", "match": "95%", "reason": "Por que combina..."}
+                  ],
+                  "message": "Uma mensagem final de encerramento inspiradora."
+              }
+              `;
+          } else {
+              prompt = `
+              Atue como um psicólogo vocacional. O objetivo é descobrir a vocação do usuário.
+              Conversa até agora:
+              ${history}
+              Usuário: ${userText}
+              
+              Instruções:
+              1. Analise a resposta.
+              2. Faça UMA nova pergunta exploratória (sobre habilidades, valores, ambiente de trabalho preferido, etc).
+              3. Seja empático e breve.
+              
+              Responda apenas com a sua fala (texto puro).
+              `;
+          }
 
-    return (
-        <div className="h-[calc(100vh-140px)] flex flex-col max-w-4xl mx-auto">
-             <div className="flex items-center space-x-2 mb-4">
-                <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional</h2>
-            </div>
-            
-            <div className="flex-grow bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 flex flex-col overflow-hidden">
-                <div className="flex-grow overflow-y-auto p-6 space-y-4">
-                     {messages.map((m, i) => (
-                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                             <div className={`max-w-[80%] p-4 rounded-2xl relative group ${m.role === 'user' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-white/60 dark:bg-dark-700/60 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600'}`}>
-                                 {m.content}
-                                 {m.role === 'model' && (
-                                     <button onClick={() => speakText(m.content)} className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-primary-500">
-                                        <Icons.Speaker />
-                                    </button>
-                                 )}
-                             </div>
+          const result = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: isFinalizing ? { responseMimeType: 'application/json' } : {}
+          });
+
+          const text = result.text || "";
+
+          if (isFinalizing) {
+              try {
+                  const data = JSON.parse(text);
+                  setReport(data);
+                  addMessage('model', data.message || "Análise concluída.");
+              } catch(e) {
+                   console.error("JSON Parse error", e);
+                   addMessage('model', "Concluímos o teste, mas tive um problema ao gerar o relatório visual. " + text);
+              }
+          } else {
+              addMessage('model', text);
+          }
+
+      } catch (e) {
+          console.error(e);
+          addMessage('model', "Desculpe, tive um erro de conexão. Tente novamente.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  return (
+    <div className="h-[calc(100vh-140px)] flex flex-col max-w-4xl mx-auto">
+        <div className="flex items-center space-x-2 mb-4">
+            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional IA</h2>
+        </div>
+
+        <div className="flex-grow flex flex-col bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 overflow-hidden relative">
+             <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-hide">
+                {messages.map((m, i) => (
+                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${m.role === 'user' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-white dark:bg-dark-700 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-200 dark:border-gray-600'}`}>
+                            {m.content}
                         </div>
-                    ))}
-                    {loading && <div className="p-4"><TypingIndicator /></div>}
-                    <div ref={scrollRef} />
-                </div>
-                <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm flex gap-2">
-                    <input 
-                        type="text" 
-                        className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-white placeholder-gray-400"
+                    </div>
+                ))}
+                 {loading && (
+                     <div className="flex justify-start">
+                         <TypingIndicator />
+                     </div>
+                 )}
+                 <div ref={scrollRef} />
+             </div>
+
+             {report && (
+                 <div className="absolute inset-0 bg-white/95 dark:bg-dark-900/95 z-20 p-8 overflow-y-auto animate-fade-in flex flex-col">
+                     <h3 className="text-3xl font-bold text-center mb-2 text-primary-600">Seu Mapa Vocacional</h3>
+                     <div className="w-16 h-1 bg-primary-500 mx-auto rounded-full mb-6"></div>
+                     <p className="text-center text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">"{report.analysis}"</p>
+                     
+                     <div className="grid md:grid-cols-3 gap-6 w-full mb-8">
+                         {report.careers?.map((c: any, i: number) => (
+                             <div key={i} className="p-6 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-dark-800 shadow-lg hover:-translate-y-1 transition-transform">
+                                 <div className="flex justify-between items-start mb-3">
+                                     <h4 className="font-bold text-lg text-slate-800 dark:text-white">{c.title}</h4>
+                                     <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">{c.match}</span>
+                                 </div>
+                                 <p className="text-sm text-gray-600 dark:text-gray-400 leading-snug">{c.reason}</p>
+                             </div>
+                         ))}
+                     </div>
+                     
+                     <button onClick={() => { setReport(null); setMessages([]); setStarted(false); }} className="mx-auto bg-primary-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-primary-700 transition-colors shadow-lg flex items-center gap-2">
+                         <Icons.Brain /> Refazer Teste
+                     </button>
+                 </div>
+             )}
+
+             <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+                <div className="flex space-x-2">
+                    <input
+                        type="text"
+                        className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400 backdrop-blur-sm disabled:opacity-50"
                         placeholder="Digite sua resposta..."
                         value={input}
-                        onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSend()}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        disabled={loading || !!report}
                     />
-                    <button onClick={handleSend} disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors shadow-lg">
+                    <button onClick={handleSend} disabled={loading || !!report} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
                         <Icons.Send />
                     </button>
                 </div>
             </div>
         </div>
-    );
-}
+    </div>
+  );
+};
 
-const root = createRoot(document.getElementById("root")!);
+// --- Mount Application ---
+const root = createRoot(document.getElementById('root')!);
 root.render(<App />);
