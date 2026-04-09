@@ -1,120 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { createRoot } from "react-dom/client";
-import { GoogleGenAI, LiveServerMessage, Modality, Type, FunctionDeclaration } from "@google/genai";
+import React, { useState, useRef, useEffect } from 'react';
+import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 
-// --- Icons ---
-const Icons = {
-  Resume: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-  Microphone: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>,
-  Brain: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
-  Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>,
-  Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
-  Send: () => <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>,
-  Stop: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>,
-  Home: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
-  Download: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
-  Edit: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
-  Check: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-  Plus: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
-  Trash: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-  Search: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-  MapPin: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-  Briefcase: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
-  Upload: () => <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
-  Speaker: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>,
-  Sparkles: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
-  Clock: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  FileText: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-};
+// --- Types ---
 
-const RECRUITER_PROFILES = [
-    {
-        name: "Mariana Costa",
-        role: "Talent Acquisition Lead",
-        voice: "Kore",
-        style: "Entusiasta, acolhedora, foca em cultura e soft skills. Fala com energia.",
-        avatar: "https://i.pravatar.cc/300?img=5"
-    },
-    {
-        name: "Carlos Mendes",
-        role: "Diretor Técnico",
-        voice: "Fenrir",
-        style: "Sério, direto, foca em desafios técnicos e resolução de problemas. Voz grave e calma.",
-        avatar: "https://i.pravatar.cc/300?img=11"
-    },
-    {
-        name: "Fernanda Lima",
-        role: "HR Business Partner",
-        voice: "Aoede",
-        style: "Profissional, polida, articula bem as palavras. Foca em carreira e ambição.",
-        avatar: "https://i.pravatar.cc/300?img=9"
-    },
-    {
-        name: "Roberto Almeida",
-        role: "Gerente de Operações",
-        voice: "Charon",
-        style: "Pragmático, experiente, paternal. Gosta de ouvir histórias de superação.",
-        avatar: "https://i.pravatar.cc/300?img=3"
-    },
-    {
-        name: "Julia Silva",
-        role: "Líder de Design e Inovação",
-        voice: "Puck",
-        style: "Criativa, curiosa, informal. Faz perguntas fora da caixa.",
-        avatar: "https://i.pravatar.cc/300?img=1"
-    }
-];
-
-// --- API & Types ---
-const API_KEY = process.env.API_KEY;
-
-// Sound Effects System
-const SoundFX = {
-  ctx: null as AudioContext | null,
-  init: () => {
-    if (!SoundFX.ctx) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      SoundFX.ctx = new AudioContextClass();
-    }
-  },
-  playTone: (freq: number, type: OscillatorType, duration: number, vol = 0.1) => {
-    try {
-        if (!SoundFX.ctx) SoundFX.init();
-        const ctx = SoundFX.ctx!;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        gain.gain.setValueAtTime(vol, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-        
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + duration);
-    } catch(e) {}
-  },
-  playConnect: () => {
-     SoundFX.playTone(440, 'sine', 0.1);
-     setTimeout(() => SoundFX.playTone(880, 'sine', 0.2), 100);
-  },
-  playDisconnect: () => {
-     SoundFX.playTone(880, 'sine', 0.1);
-     setTimeout(() => SoundFX.playTone(440, 'sine', 0.2), 100);
-  },
-  playPop: () => {
-      SoundFX.playTone(600, 'sine', 0.05, 0.05);
-  },
-  playPing: () => {
-      SoundFX.playTone(1200, 'triangle', 0.3, 0.05);
-  }
-};
-
-// Resume Data Structure
-interface Skill {
-  name: string;
-  level: number; // 1-5
+interface JobVacancy {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: string;
+  description: string;
+  requirements: string[];
 }
 
 interface ResumeData {
@@ -123,932 +19,122 @@ interface ResumeData {
     email: string;
     phone: string;
     linkedin: string;
-    github: string;
     location: string;
   };
   summary: string;
   experience: { role: string; company: string; duration: string; description: string }[];
-  education: { degree: string; school: string; year: string }[];
-  skills: Skill[];
-  languages: { name: string; level: string }[];
+  skills: { name: string; level: number }[];
 }
 
-const initialResumeData: ResumeData = {
-  personalInfo: { fullName: "", email: "", phone: "", linkedin: "", github: "", location: "" },
-  summary: "",
-  experience: [],
-  education: [],
-  skills: [],
-  languages: [],
+interface RecruiterProfile {
+    name: string;
+    role: string;
+    style: string;
+}
+
+// --- Mocks & Constants ---
+
+const SoundFX = {
+  playPop: () => {},
+  playPing: () => {},
+  playDisconnect: () => {},
+  playConnect: () => {},
 };
 
-// --- TTS Helper ---
-const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Priority: Google Português do Brasil -> Any pt-BR -> Default
-        const voices = window.speechSynthesis.getVoices();
-        const ptVoice = voices.find(v => v.name.includes("Google Português do Brasil")) || 
-                        voices.find(v => v.lang === "pt-BR");
-        
-        if (ptVoice) {
-            utterance.voice = ptVoice;
-        }
-        utterance.lang = 'pt-BR';
-        utterance.rate = 1.05; // Natural pace
-        utterance.pitch = 1.0;
-        window.speechSynthesis.speak(utterance);
-    }
+const RECRUITER_PROFILES: RecruiterProfile[] = [
+    { name: "Sarah", role: "Gerente de RH", style: "Profissional e acolhedora" },
+    { name: "Roberto", role: "Líder Técnico", style: "Direto e analítico" },
+    { name: "Amanda", role: "Talent Acquisition", style: "Curiosa e dinâmica" }
+];
+
+const durationLimits: Record<string, number> = {
+    short: 300,
+    medium: 600,
+    long: 900
 };
 
-// Ensure voices are loaded for Chrome
-if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => {};
-}
+// --- Helper Functions for Audio Processing ---
 
-// --- Helper Components ---
-
-function ProgressBar({ level }: { level: number }) {
-  return (
-    <div className="w-full bg-gray-200 rounded-full h-2.5 print:bg-gray-200">
-      <div className="bg-primary-600 h-2.5 rounded-full print:bg-black" style={{ width: `${(level / 5) * 100}%` }}></div>
-    </div>
-  );
-}
-
-function Dots({ level }: { level: number }) {
-  return (
-    <div className="flex space-x-1">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className={`w-3 h-3 rounded-full print:border print:border-black ${i <= level ? 'bg-primary-600 print:bg-black' : 'bg-gray-300 dark:bg-gray-600 print:bg-white'}`} />
-      ))}
-    </div>
-  );
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex space-x-1 p-2 bg-white/50 dark:bg-dark-700/50 rounded-2xl rounded-tl-none w-16 items-center justify-center backdrop-blur-sm">
-      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-    </div>
-  );
-}
-
-// --- Main App Component ---
-
-const App = () => {
-  const [view, setView] = useState<'home' | 'resume' | 'interview' | 'vocational'>('home');
-  // Shared state to allow Interview to access generated resume
-  const [globalResume, setGlobalResume] = useState<ResumeData | null>(null);
-
-  const renderView = () => {
-    switch (view) {
-      case 'home': return <Home setView={setView} />;
-      case 'resume': return <ResumeBuilder onBack={() => setView('home')} onComplete={setGlobalResume} />;
-      case 'interview': return <InterviewSimulator onBack={() => setView('home')} globalResume={globalResume} setGlobalResume={setGlobalResume} />;
-      case 'vocational': return <VocationalTest onBack={() => setView('home')} />;
-      default: return <Home setView={setView} />;
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-dark-900 transition-colors duration-300 relative overflow-x-hidden">
-       {/* Ambient Gradient Background */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 dark:opacity-20">
-          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-400/30 rounded-full blur-[100px] animate-pulse-slow"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-400/30 rounded-full blur-[100px] animate-pulse-slow delay-1000"></div>
-      </div>
-
-      <Header setView={setView} />
-      <main className="flex-grow container mx-auto px-4 py-6 relative z-10">
-        {renderView()}
-      </main>
-      <Footer />
-    </div>
-  );
-};
-
-// --- Header / Footer ---
-
-const Header = ({ setView }: { setView: (v: any) => void }) => (
-  <header className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-50 transition-all duration-300">
-    <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-      <div className="flex items-center space-x-2 cursor-pointer group" onClick={() => setView('home')}>
-        <div className="bg-primary-600 p-2 rounded-lg text-white group-hover:bg-primary-700 transition-colors shadow-lg shadow-primary-500/30">
-          <Icons.Brain />
-        </div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">PPE <span className="text-primary-600 font-normal hidden sm:inline">- Prática Profissional Entrevistadora</span></h1>
-      </div>
-      <ThemeToggle />
-    </div>
-  </header>
-);
-
-const Footer = () => (
-  <footer className="bg-white/60 dark:bg-dark-800/60 backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 py-6 mt-auto transition-colors duration-300">
-    <div className="container mx-auto px-4 text-center text-sm text-gray-500 dark:text-gray-400">
-      <p>Desenvolvido por <span className="font-semibold text-primary-600">Renan Dias</span></p>
-      <a href="https://github.com/renan-dias" target="_blank" rel="noopener noreferrer" className="hover:text-primary-500 transition-colors">github.com/renan-dias</a>
-    </div>
-  </footer>
-);
-
-const ThemeToggle = () => {
-  const [isDark, setIsDark] = useState(true);
-  useEffect(() => {
-    if (isDark) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDark]);
-
-  return (
-    <button onClick={() => setIsDark(!isDark)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors">
-      {isDark ? <Icons.Sun /> : <Icons.Moon />}
-    </button>
-  );
-};
-
-// --- Home Dashboard ---
-
-const Home = ({ setView }: { setView: (v: any) => void }) => (
-  <div className="max-w-4xl mx-auto space-y-12 animate-fade-in pb-10">
-    <div className="text-center space-y-6 py-12">
-      <h2 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-purple-600 pb-2">Prepare-se para o seu futuro</h2>
-      <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-        A ferramenta definitiva para alavancar sua carreira. Crie currículos perfeitos, simule entrevistas com IA de voz e descubra sua vocação.
-      </p>
-    </div>
-
-    <div className="grid md:grid-cols-3 gap-8">
-      <DashboardCard
-        title="Construtor de Currículo"
-        desc="Crie um CV ATS-friendly com auxílio de um consultor especialista."
-        icon={<Icons.Resume />}
-        color="bg-gradient-to-br from-blue-500 to-blue-600"
-        onClick={() => setView('resume')}
-      />
-      <DashboardCard
-        title="Simulador de Entrevista"
-        desc="Pratique com um recrutador realista em tempo real (Áudio)."
-        icon={<Icons.Microphone />}
-        color="bg-gradient-to-br from-emerald-500 to-emerald-600"
-        onClick={() => setView('interview')}
-      />
-      <DashboardCard
-        title="Teste Vocacional"
-        desc="Descubra sua área ideal conversando com nosso psicólogo."
-        icon={<Icons.Brain />}
-        color="bg-gradient-to-br from-violet-500 to-violet-600"
-        onClick={() => setView('vocational')}
-      />
-    </div>
-  </div>
-);
-
-const DashboardCard = ({ title, desc, icon, color, onClick }: any) => (
-  <div onClick={onClick} className="group bg-white/80 dark:bg-dark-800/80 backdrop-blur-lg rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer border border-white/20 dark:border-gray-700/50 hover:-translate-y-2 hover:bg-white dark:hover:bg-dark-800">
-    <div className={`${color} w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-      {icon}
-    </div>
-    <h3 className="text-xl font-bold mb-3 text-slate-800 dark:text-slate-100">{title}</h3>
-    <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{desc}</p>
-  </div>
-);
-
-// --- Resume Builder (Refined) ---
-
-type TemplateType = 'corporate' | 'creative' | 'academic';
-
-const ResumeBuilder = ({ onBack, onComplete }: { onBack: () => void, onComplete: (data: ResumeData) => void }) => {
-  const [step, setStep] = useState<'template' | 'chat' | 'editor' | 'preview'>('template');
-  const [template, setTemplate] = useState<TemplateType>('corporate');
-  const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData);
-  const [importedText, setImportedText] = useState("");
-
-  const handleFinish = () => {
-      onComplete(resumeData);
-      setStep('editor');
+function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
+  return btoa(binary);
+}
 
-  // Visual Previews for Templates
-  const renderTemplatePreview = (type: TemplateType) => {
-      switch(type) {
-          case 'corporate':
-              return (
-                  <div className="w-full h-32 bg-white border border-gray-200 p-2 flex flex-col gap-1 rounded-sm shadow-sm opacity-80 overflow-hidden">
-                      <div className="h-4 bg-gray-800 w-full mb-1"></div>
-                      <div className="h-2 bg-gray-300 w-3/4"></div>
-                      <div className="flex gap-1 mt-1">
-                          <div className="w-2/3 flex flex-col gap-1">
-                              <div className="h-2 bg-gray-300 w-full"></div>
-                              <div className="h-1 bg-gray-200 w-full"></div>
-                              <div className="h-1 bg-gray-200 w-full"></div>
-                              <div className="h-2 bg-gray-300 w-full mt-1"></div>
-                              <div className="h-1 bg-gray-200 w-full"></div>
-                          </div>
-                          <div className="w-1/3 bg-gray-100 p-1 flex flex-col gap-1">
-                               <div className="h-2 bg-gray-300 w-full"></div>
-                               <div className="h-1 bg-gray-200 w-full"></div>
-                          </div>
-                      </div>
-                  </div>
-              )
-           case 'creative':
-              return (
-                  <div className="w-full h-32 bg-white border border-gray-200 flex rounded-sm shadow-sm opacity-80 overflow-hidden">
-                       <div className="w-1/3 bg-gray-800 h-full p-1 flex flex-col gap-1">
-                           <div className="h-4 w-full bg-gray-600 rounded-full mb-2"></div>
-                           <div className="h-1 w-full bg-gray-500"></div>
-                           <div className="h-1 w-full bg-gray-500"></div>
-                       </div>
-                       <div className="w-2/3 p-2 flex flex-col gap-1">
-                           <div className="h-2 bg-gray-300 w-1/2 mb-1"></div>
-                           <div className="h-1 bg-gray-200 w-full"></div>
-                           <div className="h-1 bg-gray-200 w-full"></div>
-                           <div className="h-2 bg-gray-300 w-1/2 mt-1"></div>
-                           <div className="h-1 bg-gray-200 w-full"></div>
-                           <div className="flex gap-1 mt-1"><div className="w-2 h-2 rounded-full bg-gray-300"></div><div className="w-2 h-2 rounded-full bg-gray-300"></div></div>
-                       </div>
-                  </div>
-              )
-            case 'academic':
-                return (
-                  <div className="w-full h-32 bg-white border border-gray-200 p-2 flex flex-col gap-1 rounded-sm shadow-sm opacity-80 overflow-hidden text-[4px] font-serif">
-                      <div className="text-center font-bold">NOME DO CANDIDATO</div>
-                      <div className="text-center text-[3px]">email@email.com • 1234-5678</div>
-                      <div className="border-b border-black mt-1"></div>
-                      <div className="font-bold mt-1">RESUMO</div>
-                      <div className="bg-gray-200 h-2 w-full"></div>
-                      <div className="font-bold mt-1">EDUCAÇÃO</div>
-                      <div className="flex justify-between"><div className="bg-gray-200 h-1 w-10"></div><div className="bg-gray-200 h-1 w-4"></div></div>
-                  </div>
-              )
-      }
+function createBlob(data: Float32Array): { data: string; mimeType: string } {
+  const l = data.length;
+  const int16 = new Int16Array(l);
+  for (let i = 0; i < l; i++) {
+    int16[i] = data[i] * 32768;
   }
-
-  return (
-    <div className="h-[calc(100vh-140px)] flex flex-col">
-      <div className="flex items-center space-x-2 mb-4">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Construtor de Currículo</h2>
-      </div>
-
-      {step === 'template' && (
-        <div className="flex-grow flex flex-col items-center justify-center space-y-8 animate-fade-in overflow-y-auto p-4">
-          <div className="text-center space-y-2">
-            <h3 className="text-xl text-gray-600 dark:text-gray-300">Escolha o estilo do seu currículo</h3>
-            <p className="text-sm text-gray-500">Todos os modelos são otimizados para ATS (Sistemas de Rastreamento de Candidatos).</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-6 w-full max-w-5xl">
-            {[
-              { id: 'corporate', name: 'Corporativo (ATS)', desc: 'Alta legibilidade. Estrutura clássica. Ideal para grandes empresas.', color: 'border-blue-500' },
-              { id: 'creative', name: 'Criativo Moderno', desc: 'Design arrojado com barra lateral. Ótimo para Tech e Design.', color: 'border-pink-500' },
-              { id: 'academic', name: 'Acadêmico/Pesquisa', desc: 'Focado em publicações e detalhes textuais. Fonte serifada.', color: 'border-green-500' }
-            ].map((t) => (
-              <button
-                key={t.id}
-                onClick={() => { setTemplate(t.id as TemplateType); setStep('chat'); }}
-                className={`p-6 bg-white/90 dark:bg-dark-800/90 backdrop-blur-sm border-2 ${template === t.id ? t.color : 'border-transparent'} hover:border-primary-500 rounded-xl shadow-lg transition-all text-left space-y-4 group`}
-              >
-                <div className="w-full rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 group-hover:shadow-md transition-shadow">
-                    {renderTemplatePreview(t.id as TemplateType)}
-                </div>
-                <div>
-                    <h4 className="text-lg font-bold text-slate-800 dark:text-white">{t.name}</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{t.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="w-full max-w-lg mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-              <label className="text-sm font-semibold text-gray-500 mb-2 block">Já tem um resumo? Cole aqui para acelerar (Opcional):</label>
-              <textarea 
-                className="w-full p-3 rounded-lg border dark:bg-dark-700/50 dark:border-gray-600 text-sm h-24 backdrop-blur-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                placeholder="Ex: Sou João, engenheiro de software com 5 anos de experiência..."
-                value={importedText}
-                onChange={e => setImportedText(e.target.value)}
-              />
-              {importedText && (
-                  <button 
-                    onClick={() => { setTemplate('corporate'); setStep('chat'); }}
-                    className="mt-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                      Usar texto e iniciar Chat &rarr;
-                  </button>
-              )}
-          </div>
-        </div>
-      )}
-
-      {step === 'chat' && (
-        <ResumeChat
-          template={template}
-          resumeData={resumeData}
-          setResumeData={setResumeData}
-          onFinish={handleFinish}
-          initialContext={importedText}
-        />
-      )}
-
-      {step === 'editor' && (
-        <ResumeEditor
-          data={resumeData}
-          setData={setResumeData}
-          onPreview={() => setStep('preview')}
-        />
-      )}
-
-      {step === 'preview' && (
-        <ResumePreview
-          data={resumeData}
-          template={template}
-          onEdit={() => setStep('editor')}
-        />
-      )}
-    </div>
-  );
-};
-
-// --- Resume Chat ---
-
-const ResumeChat = ({ template, resumeData, setResumeData, onFinish, initialContext }: any) => {
-  const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string; widget?: any }[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [ai, setAi] = useState<GoogleGenAI | null>(null);
-  const [hasStarted, setHasStarted] = useState(false);
-
-  useEffect(() => {
-    const client = new GoogleGenAI({ apiKey: API_KEY });
-    setAi(client);
-    
-    if (!hasStarted) {
-        setHasStarted(true);
-        setLoading(true);
-        setTimeout(() => {
-            if (initialContext) {
-                handleSend(initialContext, true);
-            } else {
-                addMessage('model', "Olá! Sou seu consultor especialista em currículos ATS. Vou te fazer perguntas rápidas para montar um perfil de destaque. Qual é o seu nome completo?");
-                setLoading(false);
-            }
-        }, 1000);
-    }
-  }, []);
-
-  const addMessage = (role: 'user' | 'model', content: string, widget?: any) => {
-    setMessages(prev => [...prev, { role, content, widget }]);
-    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    if(role === 'model') {
-        speakText(content);
-        SoundFX.playPop();
-    }
+  return {
+    data: encode(new Uint8Array(int16.buffer)),
+    mimeType: 'audio/pcm;rate=16000',
   };
-
-  const handleSend = async (text: string, isHiddenContext = false) => {
-    if (!text.trim() || !ai) return;
-
-    if (!isHiddenContext) {
-        addMessage('user', text);
-        setInput("");
-        setQuickReplies([]);
-    }
-    
-    setLoading(true); 
-
-    try {
-      const history = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Consultor'}: ${m.content}`).join('\n');
-      const prompt = `
-        ATUE COMO UM ESPECIALISTA EM CURRÍCULOS E ATS (Applicant Tracking Systems).
-        Você está entrevistando o usuário. NÃO se identifique como IA, você é um consultor humano.
-        
-        OBJETIVO: Preencher o JSON do currículo com linguagem otimizada para o mercado.
-        REGRAS DE ATS:
-        - Use verbos de ação fortes (Gerenciei, Desenvolvi, Liderei).
-        - Quantifique resultados sempre que possível.
-        - Use palavras-chave da indústria do usuário.
-
-        Dados atuais (JSON): ${JSON.stringify(resumeData)}
-        Histórico:
-        ${history}
-        ${isHiddenContext ? `CONTEXTO INICIAL DO USUÁRIO: ${text}` : `Usuário: ${text}`}
-
-        INSTRUÇÕES DE INTERAÇÃO:
-        1. Analise a entrada. Atualize o JSON.
-        2. IMPORTANTE: Ao atualizar listas (experience, education, skills), envie a LISTA COMPLETA com os novos itens adicionados/modificados.
-        3. Formule a próxima pergunta. Seja BREVE e direto. Uma pergunta por vez.
-        4. Se o usuário der uma resposta curta (ex: "trabalhei na loja x"), peça detalhes: "Quais eram suas principais responsabilidades lá?".
-        5. Sugira Skills no widget baseado no cargo.
-        6. Quando tiver Nome, Email, Resumo (curto), 1 Experiência e 1 Formação, sugira finalizar.
-
-        RESPOSTA JSON APENAS:
-        {
-          "message": "Texto da resposta (max 2 frases).",
-          "quickReplies": ["Sim", "Não", "Pular"],
-          "updateResume": { ...partial data structure (COMPLETE ARRAYS) ... },
-          "widget": { "type": "skills" | "contact" | "none", "data": [] },
-          "completed": boolean
-        }
-      `;
-
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { responseMimeType: 'application/json' }
-      });
-
-      const responseText = result.text || "{}";
-      const response = JSON.parse(responseText);
-
-      setTimeout(() => {
-        if (response.updateResume) {
-            setResumeData((prev: any) => {
-                const newData = { ...prev };
-                if (response.updateResume.personalInfo) newData.personalInfo = { ...newData.personalInfo, ...response.updateResume.personalInfo };
-                if (response.updateResume.summary) newData.summary = response.updateResume.summary;
-                
-                // CRITICAL: Replace arrays to avoid duplicates
-                if (response.updateResume.experience) newData.experience = response.updateResume.experience;
-                if (response.updateResume.education) newData.education = response.updateResume.education;
-                if (response.updateResume.skills && response.updateResume.skills.length > 0) newData.skills = response.updateResume.skills;
-                
-                return newData;
-            });
-        }
-
-        addMessage('model', response.message, response.widget);
-        setQuickReplies(response.quickReplies || []);
-
-        if (response.completed) {
-            setTimeout(onFinish, 2500);
-        }
-        setLoading(false);
-      }, 1500); 
-
-    } catch (e) {
-      console.error(e);
-      setLoading(false);
-      addMessage('model', "Desculpe, não entendi. Pode repetir?");
-    }
-  };
-
-  // --- Widgets ---
-
-  const handleSkillsUpdate = (newSkills: Skill[]) => {
-      setResumeData((prev: any) => {
-         // Merge unique skills
-         const existingNames = new Set(prev.skills.map((s: Skill) => s.name));
-         const uniqueNew = newSkills.filter(s => !existingNames.has(s.name));
-         return {
-             ...prev,
-             skills: [...prev.skills, ...uniqueNew]
-         }
-      });
-  };
-
-  const handleContactUpdate = (info: any) => {
-      setResumeData((prev: any) => ({ ...prev, personalInfo: { ...prev.personalInfo, ...info } }));
-      handleSend("Contatos atualizados.");
-  };
-
-  return (
-    <div className="flex flex-col flex-grow bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 overflow-hidden">
-      <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-hide">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm relative group backdrop-blur-sm ${m.role === 'user' ? 'bg-primary-600/90 text-white rounded-tr-none' : 'bg-white/60 dark:bg-dark-700/60 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-gray-600'}`}>
-              {m.content}
-              {m.role === 'model' && (
-                  <button onClick={() => speakText(m.content)} className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-primary-500">
-                      <Icons.Speaker />
-                  </button>
-              )}
-            </div>
-            {m.widget?.type === 'skills' && (
-                <SkillsWidget suggestions={m.widget.data} currentSkills={resumeData.skills} onSave={(s) => { handleSkillsUpdate(s); handleSend("Skills definidas."); }} />
-            )}
-             {m.widget?.type === 'contact' && (
-                <ContactWidget currentInfo={resumeData.personalInfo} onSave={handleContactUpdate} />
-            )}
-          </div>
-        ))}
-        {loading && (
-            <div className="flex flex-col items-start">
-                 <TypingIndicator />
-            </div>
-        )}
-        <div ref={scrollRef} />
-      </div>
-
-      <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-        {quickReplies.length > 0 && !loading && (
-          <div className="flex flex-wrap gap-2 mb-3 animate-fade-in">
-            {quickReplies.map((r, i) => (
-              <button key={i} onClick={() => handleSend(r)} className="px-3 py-1 bg-white dark:bg-dark-700 border border-primary-200 dark:border-primary-900 text-primary-600 dark:text-primary-400 rounded-full text-sm hover:bg-primary-50 dark:hover:bg-dark-600 transition-colors shadow-sm">
-                {r}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400 backdrop-blur-sm"
-            placeholder="Digite sua resposta..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
-          />
-          <button onClick={() => handleSend(input)} disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
-            <Icons.Send />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SkillsWidget = ({ suggestions, currentSkills, onSave }: any) => {
-    const [selected, setSelected] = useState<Skill[]>([]);
-
-    useEffect(() => {
-        if (suggestions) {
-            const newOpts = suggestions.map((name: string) => ({ name, level: 3 }));
-            setSelected(newOpts);
-        }
-    }, [suggestions]);
-
-    const updateLevel = (idx: number, level: number) => {
-        const newSel = [...selected];
-        newSel[idx].level = level;
-        setSelected(newSel);
-    }
-
-    return (
-        <div className="mt-2 p-4 bg-white/90 dark:bg-dark-800/90 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-600 w-full max-w-md shadow-md animate-fade-in">
-            <h4 className="font-semibold mb-3 text-sm text-gray-500 uppercase tracking-wide">Defina seu nível de habilidade</h4>
-            <div className="space-y-3">
-                {selected.map((s, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{s.name}</span>
-                        <div className="flex space-x-1">
-                            {[1,2,3,4,5].map(l => (
-                                <button key={l} onClick={() => updateLevel(i, l)} className={`w-6 h-6 rounded-full text-xs flex items-center justify-center transition-all ${l <= s.level ? 'bg-primary-600 text-white scale-110' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:bg-gray-200'}`}>
-                                    {l}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <button onClick={() => onSave(selected)} className="mt-4 w-full py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors shadow-sm">
-                Confirmar Habilidades
-            </button>
-        </div>
-    )
 }
 
-const ContactWidget = ({ currentInfo, onSave }: any) => {
-    const [info, setInfo] = useState(currentInfo);
-    return (
-        <div className="mt-2 p-4 bg-white/90 dark:bg-dark-800/90 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-600 w-full max-w-md space-y-3 shadow-md animate-fade-in">
-             <h4 className="font-semibold mb-1 text-sm text-gray-500 uppercase tracking-wide">Informações de Contato</h4>
-            <input type="text" placeholder="LinkedIn URL" value={info.linkedin} onChange={e => setInfo({...info, linkedin: e.target.value})} className="w-full p-2 text-sm border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
-            <input type="text" placeholder="GitHub URL" value={info.github} onChange={e => setInfo({...info, github: e.target.value})} className="w-full p-2 text-sm border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
-            <input type="text" placeholder="Telefone" value={info.phone} onChange={e => setInfo({...info, phone: e.target.value})} className="w-full p-2 text-sm border rounded-lg dark:bg-dark-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none" />
-            <button onClick={() => onSave(info)} className="w-full py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 shadow-sm transition-colors">Salvar Contatos</button>
-        </div>
-    )
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
-// --- Resume Editor ---
+function decodeRawPcm(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): AudioBuffer {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
-const ResumeEditor = ({ data, setData, onPreview }: any) => {
-    const handleChange = (section: string, field: string, value: any, index?: number) => {
-        setData((prev: any) => {
-            const newData = { ...prev };
-            if (section === 'personalInfo') {
-                newData.personalInfo[field] = value;
-            } else if (index !== undefined) {
-                newData[section][index][field] = value;
-            } else {
-                newData[section] = value;
-            }
-            return newData;
-        });
-    };
-
-    return (
-        <div className="flex flex-col h-full space-y-4 animate-fade-in pb-10">
-             <div className="flex justify-between items-center bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-4 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white">Revisar Dados</h3>
-                <button onClick={onPreview} className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors shadow-md">
-                    <Icons.Check /> <span>Gerar Visualização</span>
-                </button>
-            </div>
-            
-            <div className="flex-grow overflow-y-auto space-y-6 p-1">
-                {/* Personal Info */}
-                <section className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 space-y-4">
-                    <h4 className="text-lg font-semibold border-b pb-2 dark:border-gray-700 text-slate-800 dark:text-white">Dados Pessoais</h4>
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <Input label="Nome Completo" value={data.personalInfo.fullName} onChange={(e) => handleChange('personalInfo', 'fullName', e.target.value)} />
-                        <Input label="Email" value={data.personalInfo.email} onChange={(e) => handleChange('personalInfo', 'email', e.target.value)} />
-                        <Input label="Telefone" value={data.personalInfo.phone} onChange={(e) => handleChange('personalInfo', 'phone', e.target.value)} />
-                        <Input label="Localização" value={data.personalInfo.location} onChange={(e) => handleChange('personalInfo', 'location', e.target.value)} />
-                        <Input label="LinkedIn" value={data.personalInfo.linkedin} onChange={(e) => handleChange('personalInfo', 'linkedin', e.target.value)} />
-                        <Input label="GitHub/Portfolio" value={data.personalInfo.github} onChange={(e) => handleChange('personalInfo', 'github', e.target.value)} />
-                    </div>
-                </section>
-
-                <section className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 space-y-4">
-                    <h4 className="text-lg font-semibold border-b pb-2 dark:border-gray-700 text-slate-800 dark:text-white">Resumo Profissional</h4>
-                    <textarea 
-                        className="w-full h-32 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent focus:ring-2 focus:ring-primary-500 text-slate-800 dark:text-white" 
-                        value={data.summary} 
-                        onChange={(e) => handleChange('summary', '', e.target.value)} 
-                    />
-                </section>
-
-                {/* Experience - simplified list for brevity */}
-                 <section className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-sm border border-gray-200/50 dark:border-gray-700/50 space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h4 className="text-lg font-semibold text-slate-800 dark:text-white">Experiência</h4>
-                    </div>
-                    {data.experience.map((exp: any, i: number) => (
-                        <div key={i} className="p-4 border rounded-lg dark:border-gray-700 space-y-2 bg-gray-50/50 dark:bg-dark-900/50">
-                            <div className="grid grid-cols-2 gap-2">
-                                <Input label="Cargo" value={exp.role} onChange={(e) => handleChange('experience', 'role', e.target.value, i)} />
-                                <Input label="Empresa" value={exp.company} onChange={(e) => handleChange('experience', 'company', e.target.value, i)} />
-                            </div>
-                            <textarea className="w-full p-2 border rounded dark:bg-dark-700/50 dark:border-gray-600 text-slate-800 dark:text-white bg-transparent" value={exp.description} onChange={(e) => handleChange('experience', 'description', e.target.value, i)} />
-                        </div>
-                    ))}
-                </section>
-            </div>
-        </div>
-    );
-};
-
-const Input = ({ label, value, onChange }: any) => (
-    <div>
-        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
-        <input type="text" className="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent focus:ring-2 focus:ring-primary-500 text-slate-800 dark:text-white outline-none transition-all" value={value} onChange={onChange} />
-    </div>
-);
-
-
-// --- Resume Preview & Renderer ---
-
-const ResumePreview = ({ data, template, onEdit }: any) => {
-    return (
-        <div className="flex flex-col h-full animate-fade-in pb-10">
-            <div className="flex justify-between items-center mb-4 px-2">
-                <button onClick={onEdit} className="flex items-center space-x-2 text-gray-600 hover:text-primary-600 dark:text-gray-300 transition-colors">
-                    <Icons.Edit /> <span>Voltar e Editar</span>
-                </button>
-                <div className="flex space-x-3">
-                    <button onClick={() => window.print()} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg flex items-center space-x-2 shadow-lg transition-transform hover:scale-105">
-                        <Icons.Download /> <span>Salvar PDF</span>
-                    </button>
-                </div>
-            </div>
-            
-            <div className="flex-grow overflow-y-auto bg-gray-200/50 dark:bg-gray-800/50 p-8 rounded-xl flex justify-center shadow-inner border border-gray-300 dark:border-gray-700 backdrop-blur-sm">
-                <div className="transform origin-top scale-95 md:scale-100 transition-transform">
-                    <div className="bg-white text-black w-[210mm] min-h-[297mm] shadow-2xl p-0 overflow-hidden print:w-full print:h-full print:shadow-none print:m-0">
-                        {/* Template Renderer */}
-                        {template === 'corporate' && <CorporateTemplate data={data} />}
-                        {template === 'creative' && <CreativeTemplate data={data} />}
-                        {template === 'academic' && <AcademicTemplate data={data} />}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Templates ---
-
-const CorporateTemplate = ({ data }: { data: ResumeData }) => (
-    <div className="p-10 space-y-6 font-sans">
-        <header className="border-b-2 border-gray-800 pb-4">
-            <h1 className="text-4xl font-bold uppercase tracking-widest text-gray-900">{data.personalInfo.fullName}</h1>
-            <div className="mt-2 text-sm text-gray-600 flex flex-wrap gap-4 font-medium">
-                {data.personalInfo.email && <span>{data.personalInfo.email}</span>}
-                {data.personalInfo.phone && <span>{data.personalInfo.phone}</span>}
-                {data.personalInfo.linkedin && <span>{data.personalInfo.linkedin}</span>}
-                {data.personalInfo.location && <span>{data.personalInfo.location}</span>}
-            </div>
-        </header>
-
-        <section>
-            <h2 className="text-xl font-bold uppercase text-gray-800 border-b border-gray-300 mb-3">Resumo</h2>
-            <p className="text-gray-700 leading-relaxed text-justify">{data.summary}</p>
-        </section>
-
-        <div className="grid grid-cols-3 gap-8">
-            <div className="col-span-2 space-y-6">
-                <section>
-                    <h2 className="text-xl font-bold uppercase text-gray-800 border-b border-gray-300 mb-3">Experiência</h2>
-                    {data.experience.map((exp, i) => (
-                        <div key={i} className="mb-4">
-                            <h3 className="font-bold text-lg text-gray-900">{exp.role}</h3>
-                            <div className="text-sm text-gray-600 mb-1 font-medium">{exp.company} | {exp.duration}</div>
-                            <p className="text-gray-700 text-sm whitespace-pre-line leading-relaxed">{exp.description}</p>
-                        </div>
-                    ))}
-                </section>
-                <section>
-                    <h2 className="text-xl font-bold uppercase text-gray-800 border-b border-gray-300 mb-3">Formação</h2>
-                     {data.education.map((edu, i) => (
-                        <div key={i} className="mb-2">
-                             <h3 className="font-bold text-gray-900">{edu.degree}</h3>
-                             <div className="text-sm text-gray-600">{edu.school}, {edu.year}</div>
-                        </div>
-                    ))}
-                </section>
-            </div>
-            <div className="col-span-1 space-y-6">
-                 <section>
-                    <h2 className="text-xl font-bold uppercase text-gray-800 border-b border-gray-300 mb-3">Habilidades</h2>
-                    <div className="space-y-3">
-                        {data.skills.map((skill, i) => (
-                            <div key={i}>
-                                <div className="text-sm font-semibold mb-1 text-gray-700">{skill.name}</div>
-                                <ProgressBar level={skill.level} />
-                            </div>
-                        ))}
-                    </div>
-                </section>
-            </div>
-        </div>
-    </div>
-);
-
-const CreativeTemplate = ({ data }: { data: ResumeData }) => (
-    <div className="flex h-full min-h-[297mm]">
-        <aside className="w-1/3 bg-slate-900 text-white p-8 space-y-8 print:bg-slate-900 print:text-white">
-            <div className="space-y-2">
-                <h1 className="text-3xl font-black leading-tight text-white">{data.personalInfo.fullName.split(' ').map((n,i) => <div key={i}>{n}</div>)}</h1>
-                <p className="text-slate-400 text-sm">{data.personalInfo.location}</p>
-            </div>
-
-            <div className="space-y-4 text-sm text-slate-300">
-                <div className="break-all">{data.personalInfo.email}</div>
-                <div>{data.personalInfo.phone}</div>
-                <div className="break-all text-xs">{data.personalInfo.linkedin}</div>
-                <div className="break-all text-xs">{data.personalInfo.github}</div>
-            </div>
-
-            <div>
-                <h3 className="text-primary-500 font-bold tracking-widest uppercase mb-4 text-sm">Skills</h3>
-                <div className="space-y-2">
-                    {data.skills.map((skill, i) => (
-                        <div key={i} className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-slate-200">{skill.name}</span>
-                            <Dots level={skill.level} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </aside>
-        <main className="w-2/3 p-10 space-y-8 text-slate-800 bg-white">
-             <section>
-                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Perfil</h2>
-                 <p className="text-sm leading-relaxed text-gray-600 text-justify">{data.summary}</p>
-             </section>
-             <section>
-                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Experiência</h2>
-                 <div className="space-y-6">
-                    {data.experience.map((exp, i) => (
-                        <div key={i} className="relative pl-6 border-l-2 border-slate-200">
-                            <div className="absolute -left-[9px] top-1 w-4 h-4 bg-primary-500 rounded-full border-4 border-white print:border-white"></div>
-                            <h3 className="font-bold text-lg text-slate-900">{exp.role}</h3>
-                            <div className="text-primary-600 font-medium text-sm mb-2">{exp.company} <span className="text-gray-400 mx-1">•</span> {exp.duration}</div>
-                            <p className="text-sm text-gray-600">{exp.description}</p>
-                        </div>
-                    ))}
-                 </div>
-             </section>
-             <section>
-                 <h2 className="text-2xl font-bold text-slate-900 mb-4">Educação</h2>
-                 {data.education.map((edu, i) => (
-                        <div key={i} className="mb-4">
-                             <h3 className="font-bold text-slate-900">{edu.degree}</h3>
-                             <div className="text-sm text-gray-500">{edu.school}, {edu.year}</div>
-                        </div>
-                ))}
-             </section>
-        </main>
-    </div>
-);
-
-const AcademicTemplate = ({ data }: { data: ResumeData }) => (
-    <div className="p-12 font-serif text-gray-900">
-        <header className="text-center border-b-2 border-black pb-6 mb-8">
-            <h1 className="text-3xl font-bold mb-2">{data.personalInfo.fullName}</h1>
-            <p className="text-sm italic text-gray-700">{data.personalInfo.location} • {data.personalInfo.email} • {data.personalInfo.phone}</p>
-             {data.personalInfo.linkedin && <p className="text-sm text-gray-700">{data.personalInfo.linkedin}</p>}
-        </header>
-
-        <section className="mb-6">
-             <h2 className="text-lg font-bold uppercase border-b border-gray-400 mb-2 text-black">Resumo Profissional</h2>
-             <p className="text-justify leading-relaxed text-gray-800">{data.summary}</p>
-        </section>
-
-        <section className="mb-6">
-            <h2 className="text-lg font-bold uppercase border-b border-gray-400 mb-2 text-black">Experiência Profissional</h2>
-             {data.experience.map((exp, i) => (
-                <div key={i} className="mb-4">
-                    <div className="flex justify-between items-baseline">
-                        <h3 className="font-bold text-black">{exp.role}</h3>
-                        <span className="italic text-sm">{exp.duration}</span>
-                    </div>
-                    <div className="italic text-sm mb-1">{exp.company}</div>
-                    <p className="text-sm mt-1 text-gray-800">{exp.description}</p>
-                </div>
-            ))}
-        </section>
-
-        <section className="mb-6">
-            <h2 className="text-lg font-bold uppercase border-b border-gray-400 mb-2 text-black">Formação Acadêmica</h2>
-             {data.education.map((edu, i) => (
-                <div key={i} className="mb-2 flex justify-between">
-                     <div>
-                         <span className="font-bold text-black">{edu.degree}</span>, {edu.school}
-                     </div>
-                     <span className="italic text-sm">{edu.year}</span>
-                </div>
-            ))}
-        </section>
-
-        <section>
-            <h2 className="text-lg font-bold uppercase border-b border-gray-400 mb-2 text-black">Habilidades Técnicas</h2>
-            <p className="text-sm text-gray-800">
-                {data.skills.map(s => s.name).join(' • ')}
-            </p>
-        </section>
-    </div>
-);
-
-// --- Interview Simulator (Enhanced with Job Board & Glassmorphism) ---
-
-interface JobVacancy {
-    id: string;
-    title: string;
-    company: string;
-    location: string;
-    type: string;
-    description: string;
-    requirements: string[];
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
 }
 
-const Step = ({ active, completed, number, label }: any) => (
-    <div className={`flex flex-col items-center ${active ? 'text-primary-600' : 'text-gray-400'}`}>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mb-1 transition-colors ${completed ? 'bg-green-500 text-white' : active ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-            {completed ? <Icons.Check /> : number}
-        </div>
-        <span className="text-xs font-medium">{label}</span>
-    </div>
-)
+export default function InterviewApp() {
+  const API_KEY = process.env.API_KEY as string;
 
-const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack: () => void, globalResume: ResumeData | null, setGlobalResume: (data: ResumeData) => void }) => {
-  const [viewMode, setViewMode] = useState<'search' | 'resume_upload' | 'live' | 'report'>('search');
+  // --- State ---
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
   const [jobs, setJobs] = useState<JobVacancy[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobVacancy | null>(null);
-
-  const [resumeText, setResumeText] = useState("");
+  const [viewMode, setViewMode] = useState("search");
   const [uploading, setUploading] = useState(false);
+  const [globalResume, setGlobalResume] = useState<ResumeData | null>(null);
+  const [resumeText, setResumeText] = useState("");
   const [connected, setConnected] = useState(false);
-  const [finalReport, setFinalReport] = useState<any>(null);
-  const [selectedProfile, setSelectedProfile] = useState(RECRUITER_PROFILES[0]);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const sessionRef = useRef<any>(null);
   const [transcript, setTranscript] = useState<string[]>([]);
-  const currentTranscriptRef = useRef<string[]>([]);
-  const [duration, setDuration] = useState(0); // in seconds
-  const durationRef = useRef(0);
-  
-  // Interview Configuration
-  const [durationOption, setDurationOption] = useState<'short' | 'medium' | 'long'>('medium');
-  const durationLimits = { short: 180, medium: 300, long: 600 };
-  const durationLabels = { short: "Curta (3 min)", medium: "Média (5 min)", long: "Longa (10 min)" };
+  const [finalReport, setFinalReport] = useState<any>(null);
+  const [duration, setDuration] = useState(0);
+  const [durationOption, setDurationOption] = useState("short");
+  const [selectedProfile, setSelectedProfile] = useState<RecruiterProfile | null>(null);
 
-  // We keep a reference to stop audio context cleanly
+  // --- Refs ---
+  const sessionRef = useRef<any>(null);
+  const currentTranscriptRef = useRef<string[]>([]);
+  const durationRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
-  // Track audio queue to delay ending
+  const inputAudioContextRef = useRef<AudioContext | null>(null);
   const isAudioQueuePlayingRef = useRef(false);
+  const nextStartTimeRef = useRef(0);
+
+  // --- Actions ---
 
   const searchJobs = async () => {
       setLoadingJobs(true);
@@ -1070,7 +156,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
 
       try {
           const res = await client.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.1-flash-lite-preview',
               contents: prompt,
               config: { responseMimeType: 'application/json' }
           });
@@ -1109,7 +195,6 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
             reader.readAsDataURL(file);
           });
 
-          // Use Gemini 2.5 Flash to extract data
           const prompt = `
             EXTRACT all relevant data from this resume image/document into this specific JSON structure.
             If the image is not a resume, return an empty structure.
@@ -1124,7 +209,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
           `;
 
           const result = await client.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.1-flash-lite-preview',
               contents: [
                   { inlineData: { mimeType: file.type, data: base64 } },
                   { text: prompt }
@@ -1168,14 +253,12 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
   }
   
   const handleStartWithoutResume = () => {
-      setResumeText(""); // Explicitly empty
+      setResumeText(""); 
       startInterview();
   }
 
   const endSession = async () => {
-    // Graceful exit: Wait for audio queue to finish if speaking
     if (isAudioQueuePlayingRef.current) {
-        // Simple polling wait (max 5 seconds)
         for(let i=0; i<50; i++) {
             if(!isAudioQueuePlayingRef.current) break;
             await new Promise(r => setTimeout(r, 100));
@@ -1184,7 +267,28 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
     
     SoundFX.playDisconnect();
     setConnected(false);
-    if(audioContextRef.current) audioContextRef.current.close();
+    
+    if (sessionRef.current) {
+        try {
+            // Check if it has close (it might be the promise if something went wrong, but usually it's the session)
+            // sessionRef.current is typed as 'any' to avoid TS issues with the dynamic loading of types
+            if(typeof sessionRef.current.close === 'function') {
+                sessionRef.current.close();
+            }
+        } catch(e) {}
+    }
+
+    const safelyClose = async (ctx: AudioContext | null) => {
+        if (ctx && ctx.state !== 'closed') {
+            try { await ctx.close(); } catch(e) { console.error("Error closing ctx", e); }
+        }
+    };
+    
+    await safelyClose(audioContextRef.current);
+    audioContextRef.current = null;
+
+    await safelyClose(inputAudioContextRef.current);
+    inputAudioContextRef.current = null;
     
     setViewMode('report');
     generateReport();
@@ -1192,7 +296,6 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
 
   const generateReport = async () => {
       const client = new GoogleGenAI({ apiKey: API_KEY });
-      // Create a more robust transcript fallback if transcription failed
       const transcriptText = currentTranscriptRef.current.length > 0 
           ? currentTranscriptRef.current.join('\n') 
           : "Transcrição indisponível. Baseie-se no fato de que o candidato completou a entrevista.";
@@ -1222,7 +325,7 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
 
       try {
            const res = await client.models.generateContent({
-              model: 'gemini-3-pro-preview',
+              model: 'gemini-3.1-pro-preview',
               contents: prompt,
               config: { responseMimeType: 'application/json' }
           });
@@ -1238,14 +341,13 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
     let interval: any;
     if (connected && viewMode === 'live') {
         const limit = durationLimits[durationOption];
-        const warningTime = limit - 30; // Warn 30s before end
+        const warningTime = limit - 30;
 
         interval = setInterval(() => {
             setDuration(prev => {
                 const next = prev + 1;
                 durationRef.current = next;
                 
-                // Prompt to wrap up
                 if (next === warningTime && sessionRef.current) {
                     sessionRef.current.sendRealtimeInput({
                         content: {
@@ -1255,7 +357,6 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
                     });
                 }
                 
-                // Hard stop
                 if (next >= limit) {
                      endSession();
                 }
@@ -1278,7 +379,6 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
     SoundFX.playConnect();
     setViewMode('live');
     
-    // Select random profile
     const profile = RECRUITER_PROFILES[Math.floor(Math.random() * RECRUITER_PROFILES.length)];
     setSelectedProfile(profile);
 
@@ -1289,586 +389,198 @@ const InterviewSimulator = ({ onBack, globalResume, setGlobalResume }: { onBack:
 
     const client = new GoogleGenAI({ apiKey: API_KEY });
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    
     const inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
+    inputAudioContextRef.current = inputAudioContext; 
+    
     const outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
     audioContextRef.current = outputAudioContext;
+    nextStartTimeRef.current = 0;
+    isAudioQueuePlayingRef.current = false;
     
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    let nextStartTime = 0;
-    const sources = new Set<AudioBufferSourceNode>();
+    let sessionPromise: Promise<any>;
 
-    const endInterviewTool: FunctionDeclaration = {
-        name: "endInterview",
-        description: "Encerra a entrevista. Chame APÓS se despedir verbalmente.",
-        parameters: { type: Type.OBJECT, properties: {} }
-    };
-
-    const hasResume = !!resumeText;
-    const timeLimitMin = durationLimits[durationOption] / 60;
-
-    const session = await client.live.connect({
-      model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.voice } } },
-        tools: [{ functionDeclarations: [endInterviewTool] }],
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-        systemInstruction: `
-          PERSONA:
-          Você é ${profile.name}, ${profile.role} na empresa ${selectedJob.company}.
-          ESTILO DE FALA: ${profile.style}
-          Você está entrevistando o candidato para a vaga de ${selectedJob.title}.
-          TEMPO DA ENTREVISTA: Aprox ${timeLimitMin} minutos.
-
-          CONTEXTO DA VAGA:
-          Descrição: ${selectedJob.description}
-          Requisitos: ${selectedJob.requirements.join(', ')}
-
-          ${hasResume ? `CANDIDATO (Baseado no CV): ${resumeText}` : `CANDIDATO: Sem currículo prévio. Você deve fazer uma triagem completa (Screening).`}
-
-          ROTEIRO:
-          1. INÍCIO: Apresente-se (${profile.name}), mencione a empresa ${selectedJob.company} e dê as boas-vindas.
-          ${hasResume ? '2. MEIO: Faça perguntas baseadas no currículo e na vaga. Avalie soft skills e hard skills.' : '2. MEIO: Pergunte sobre a trajetória, formação e experiências passadas do candidato para traçar o perfil dele, já que você não tem o CV.'}
-          3. FIM: Quando tiver informações suficientes ou o tempo estiver acabando, agradeça o tempo do candidato, diga que entrarão em contato e despeça-se.
-          
-          IMPORTANTE - ENCERRAMENTO:
-          Sempre FALE a despedida ("Obrigado, tchau") PRIMEIRO.
-          SÓ DEPOIS de falar, chame a função "endInterview".
-        `,
-      },
+    const config = {
+      model: 'gemini-3.1-flash-live-preview',
       callbacks: {
-        onopen: () => {
-            setConnected(true);
-            
-            // Force start immediately
-            setTimeout(() => {
-                session.sendRealtimeInput({
-                    content: {
-                        role: "user",
-                        parts: [{ text: "O candidato conectou. Inicie a entrevista." }]
-                    }
-                });
-            }, 500);
-
-            const source = inputAudioContext.createMediaStreamSource(stream);
-            const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-            processor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
-                const pcm16 = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                    pcm16[i] = inputData[i] * 32768;
-                }
-                const uint8 = new Uint8Array(pcm16.buffer);
-                let binary = '';
-                const len = uint8.byteLength;
-                for (let i = 0; i < len; i++) {
-                    binary += String.fromCharCode(uint8[i]);
-                }
-                const b64 = btoa(binary);
-
-                session.sendRealtimeInput({
-                    media: {
-                        mimeType: 'audio/pcm;rate=16000',
-                        data: b64
-                    }
-                });
-            };
-            source.connect(processor);
-            processor.connect(inputAudioContext.destination);
+        onopen: async () => {
+          setConnected(true);
+          const source = inputAudioContext.createMediaStreamSource(stream);
+          const processor = inputAudioContext.createScriptProcessor(4096, 1, 1);
+          
+          processor.onaudioprocess = (e) => {
+             const inputData = e.inputBuffer.getChannelData(0);
+             const pcmBlob = createBlob(inputData);
+             if (sessionPromise) {
+                 sessionPromise.then(session => {
+                     session.sendRealtimeInput({ media: pcmBlob });
+                 });
+             }
+          };
+          
+          source.connect(processor);
+          processor.connect(inputAudioContext.destination);
         },
-        onmessage: (msg: LiveServerMessage) => {
-             // Handle Tool Calls (End Interview)
-             if (msg.toolCall) {
-                 for (const fc of msg.toolCall.functionCalls) {
-                     if (fc.name === 'endInterview') {
-                         session.sendToolResponse({
-                             functionResponses: {
-                                 name: fc.name,
-                                 id: fc.id,
-                                 response: { result: 'ok' }
-                             }
-                         });
-                         // Delay slightly to ensure "Goodbye" audio plays
-                         setTimeout(() => endSession(), 2000);
-                         return;
-                     }
-                 }
-             }
-
-             // Handle Audio Output
-             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-             if (audioData) {
-                 setIsSpeaking(true);
-                 isAudioQueuePlayingRef.current = true;
-                 // Decode Base64 manually to Float32Array
-                 const binaryString = atob(audioData);
-                 const len = binaryString.length;
-                 const bytes = new Uint8Array(len);
-                 for (let i = 0; i < len; i++) {
-                     bytes[i] = binaryString.charCodeAt(i);
-                 }
-                 const int16 = new Int16Array(bytes.buffer);
-                 const float32 = new Float32Array(int16.length);
-                 for(let i=0; i<int16.length; i++) {
-                     float32[i] = int16[i] / 32768.0;
-                 }
-
-                 const buffer = outputAudioContext.createBuffer(1, float32.length, 24000);
-                 buffer.getChannelData(0).set(float32);
-
-                 const source = outputAudioContext.createBufferSource();
-                 source.buffer = buffer;
-                 source.connect(outputAudioContext.destination);
-                 
-                 const now = outputAudioContext.currentTime;
-                 const start = Math.max(now, nextStartTime);
-                 source.start(start);
-                 nextStartTime = start + buffer.duration;
-                 
-                 source.onended = () => {
-                     if (outputAudioContext.currentTime >= nextStartTime - 0.1) {
-                         setIsSpeaking(false);
-                         isAudioQueuePlayingRef.current = false;
-                     }
-                 }
-                 sources.add(source);
-             }
-
-             // Collect Transcription for report (Hide from UI, store in ref)
-             const userT = msg.serverContent?.inputTranscription?.text;
-             const modelT = msg.serverContent?.outputTranscription?.text;
-             
-             if (userT) {
-                 const line = `Candidato: ${userT}`;
-                 currentTranscriptRef.current.push(line);
-             }
-             if (modelT) {
-                 const line = `${profile.name}: ${modelT}`;
-                 currentTranscriptRef.current.push(line);
-             }
+        onmessage: async (message: LiveServerMessage) => {
+           // Output Audio
+           const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+           if (base64Audio) {
+               isAudioQueuePlayingRef.current = true;
+               const currentTime = outputAudioContext.currentTime;
+               if (nextStartTimeRef.current < currentTime) {
+                   nextStartTimeRef.current = currentTime;
+               }
+               
+               const audioBuffer = decodeRawPcm(decode(base64Audio), outputAudioContext, 24000, 1);
+               const source = outputAudioContext.createBufferSource();
+               source.buffer = audioBuffer;
+               source.connect(outputAudioContext.destination);
+               source.start(nextStartTimeRef.current);
+               nextStartTimeRef.current += audioBuffer.duration;
+               
+               source.onended = () => {
+                   if (outputAudioContext.currentTime >= nextStartTimeRef.current - 0.1) {
+                        isAudioQueuePlayingRef.current = false;
+                   }
+               };
+           }
+           
+           // Transcription (Optional tracking)
+           // If we wanted to update transcript, we would look at message.serverContent?.outputTranscription?.text
         },
         onclose: () => {
-            setConnected(false);
+             setConnected(false);
         },
-        onerror: (e) => {
-            console.error(e);
-            setConnected(false);
+        onerror: (e: any) => {
+             console.error(e);
         }
+      },
+      config: {
+          responseModalities: [Modality.AUDIO],
+          systemInstruction: `
+            You are ${profile.name}, a ${profile.role}.
+            Your style is ${profile.style}.
+            Interviewing a candidate for: ${selectedJob?.title} at ${selectedJob?.company}.
+            Candidate Info: ${resumeText || "Not provided"}.
+            
+            Conduct a realistic job interview. 
+            Start by briefly introducing yourself and asking the candidate to introduce themselves.
+          `,
       }
-    });
-    sessionRef.current = session;
-  };
+    };
+    
+    // Connect
+    sessionPromise = client.live.connect(config);
+    sessionRef.current = await sessionPromise;
+  }
 
+  // Basic Render
   return (
-    <div className="max-w-4xl mx-auto h-[calc(100vh-140px)] flex flex-col">
-       <div className="flex items-center space-x-2 mb-4">
-            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-                {viewMode === 'search' && "Encontrar Vaga"}
-                {viewMode === 'resume_upload' && "Preparação"}
-                {viewMode === 'live' && "Entrevista em Andamento"}
-                {viewMode === 'report' && "Resultado da Entrevista"}
-            </h2>
-        </div>
-
-        {/* --- STEPPER --- */}
-        <div className="flex items-center justify-center space-x-6 mb-6">
-             <Step active={viewMode === 'search'} completed={viewMode !== 'search'} number={1} label="Vaga" />
-             <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full" />
-             <Step active={viewMode === 'resume_upload'} completed={viewMode === 'live' || viewMode === 'report'} number={2} label="Preparação" />
-             <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full" />
-             <Step active={viewMode === 'live'} completed={viewMode === 'report'} number={3} label="Entrevista" />
-        </div>
-
+    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
+        <h1>AI Interview Simulator</h1>
+        
         {viewMode === 'search' && (
-            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Cargo ou Palavra-chave (ex: Desenvolvedor React)" className="p-3 border rounded-lg dark:bg-dark-700/50 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 bg-white/50 backdrop-blur-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                    <input type="text" placeholder="Localização (ex: São Paulo, Remoto)" className="p-3 border rounded-lg dark:bg-dark-700/50 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 bg-white/50 backdrop-blur-sm" value={searchLocation} onChange={e => setSearchLocation(e.target.value)} />
+            <div>
+                <h2>Find a Job</h2>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                    <input 
+                        value={searchQuery} 
+                        onChange={e => setSearchQuery(e.target.value)} 
+                        placeholder="Job Title (e.g. Frontend Dev)" 
+                        style={{ padding: 8, flex: 1 }}
+                    />
+                    <input 
+                        value={searchLocation} 
+                        onChange={e => setSearchLocation(e.target.value)} 
+                        placeholder="Location" 
+                        style={{ padding: 8, flex: 1 }}
+                    />
+                    <button onClick={searchJobs} disabled={loadingJobs} style={{ padding: 8 }}>
+                        {loadingJobs ? 'Searching...' : 'Search'}
+                    </button>
                 </div>
-                <button onClick={searchJobs} disabled={loadingJobs} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-lg transition-colors flex justify-center items-center shadow-lg">
-                    {loadingJobs ? <span className="animate-pulse">Buscando vagas com IA...</span> : <span className="flex items-center gap-2"><Icons.Search /> Buscar Vagas</span>}
-                </button>
-
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <div>
                     {jobs.map(job => (
-                        <div key={job.id} className="border border-gray-200/50 dark:border-gray-700/50 p-4 rounded-xl hover:shadow-md transition-shadow bg-white/60 dark:bg-dark-900/60 cursor-pointer group backdrop-blur-sm" onClick={() => handleSelectJob(job)}>
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h3 className="font-bold text-lg text-primary-600 group-hover:underline">{job.title}</h3>
-                                    <p className="text-gray-600 dark:text-gray-400 font-medium">{job.company}</p>
-                                </div>
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{job.type}</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-sm text-gray-500 mt-1">
-                                <Icons.MapPin /> {job.location}
-                            </div>
-                            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{job.description}</p>
+                        <div key={job.id} style={{ border: '1px solid #ccc', padding: 10, marginBottom: 10, cursor: 'pointer' }} onClick={() => handleSelectJob(job)}>
+                            <h3>{job.title}</h3>
+                            <p><strong>{job.company}</strong> - {job.location} ({job.type})</p>
+                            <p>{job.description}</p>
                         </div>
                     ))}
-                    {jobs.length === 0 && !loadingJobs && <p className="text-center text-gray-400 py-10">Use a busca acima para encontrar oportunidades simuladas.</p>}
+                    {jobs.length === 0 && !loadingJobs && <p>No jobs found or search not started.</p>}
                 </div>
             </div>
         )}
 
         {viewMode === 'resume_upload' && selectedJob && (
-             <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-8 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 flex flex-col items-center text-center space-y-6 animate-fade-in">
-                 <div className="w-full text-left bg-blue-50/50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-900">
-                     <h3 className="font-bold text-blue-800 dark:text-blue-300">Vaga Selecionada: {selectedJob.title}</h3>
-                     <p className="text-sm text-blue-600 dark:text-blue-400">{selectedJob.company}</p>
-                 </div>
-                 
-                 {/* Duration Selection */}
-                 <div className="w-full">
-                     <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Duração da Entrevista</label>
-                     <div className="grid grid-cols-3 gap-3">
-                         {(['short', 'medium', 'long'] as const).map(opt => (
-                             <button 
-                                key={opt}
-                                onClick={() => setDurationOption(opt)}
-                                className={`py-2 rounded-lg text-sm font-medium transition-colors border ${durationOption === opt 
-                                    ? 'bg-primary-600 text-white border-primary-600' 
-                                    : 'bg-white dark:bg-dark-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-dark-600'}`}
-                             >
-                                 {durationLabels[opt]}
-                             </button>
-                         ))}
-                     </div>
-                 </div>
-
-                 <div className="space-y-2 pt-4">
-                     <h3 className="text-xl font-bold">Adicione seu Currículo (Opcional)</h3>
-                     <p className="text-gray-500 text-sm">Com o currículo, a entrevista será focada. Sem ele, será uma triagem de perfil.</p>
-                 </div>
-
-                 <div className="grid md:grid-cols-2 gap-6 w-full">
-                     <div className={`border-2 border-dashed ${uploading ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20' : 'border-gray-300 dark:border-gray-600'} rounded-xl p-6 flex flex-col items-center justify-center space-y-4 hover:border-primary-500 transition-colors cursor-pointer relative hover:bg-white/50 dark:hover:bg-dark-700/50`}>
-                         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.txt,.jpg,.png" onChange={handleResumeUpload} disabled={uploading} />
-                         {uploading ? (
-                             <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
-                         ) : (
-                             <Icons.Upload />
-                         )}
-                         <span className="text-sm font-medium">{uploading ? "Analisando com IA..." : "Upload Arquivo"}</span>
-                         <span className="text-xs text-gray-400">PDF, DOCX, TXT, IMG</span>
-                     </div>
-                     <div className="flex flex-col gap-2">
-                         <button onClick={handleImportResume} disabled={!globalResume} className="flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 flex flex-col items-center justify-center space-y-2 hover:border-primary-500 hover:bg-white/50 dark:hover:bg-dark-700/50 transition-colors disabled:opacity-50">
-                             <Icons.Resume />
-                             <span className="text-sm font-medium">Importar do Construtor</span>
-                         </button>
-                          <button onClick={handleStartWithoutResume} className="flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-xl p-4 flex flex-col items-center justify-center space-y-2 hover:border-gray-500 hover:bg-gray-100 dark:hover:bg-dark-600 transition-colors">
-                             <Icons.Brain />
-                             <span className="text-sm font-medium">Pular Currículo</span>
-                             <span className="text-xs text-gray-400">Fazer triagem</span>
-                         </button>
-                     </div>
-                 </div>
-                 
-                 {resumeText && (
-                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-300 w-full animate-fade-in">
-                         <Icons.Check />
-                         <span className="text-sm font-medium">Currículo carregado com sucesso! Pronto para a entrevista.</span>
-                     </div>
-                 )}
-
-                 <button onClick={startInterview} disabled={!resumeText && false} className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
-                     <Icons.Microphone /> Iniciar Entrevista Agora
-                 </button>
-             </div>
+            <div>
+                <h2>Apply for: {selectedJob.title}</h2>
+                <p>Upload your resume (Image/PDF) for personalized questions.</p>
+                <input type="file" onChange={handleResumeUpload} disabled={uploading} accept="image/*,application/pdf" />
+                {uploading && <p>Analyzing resume...</p>}
+                
+                {resumeText && (
+                    <div style={{ margin: '20px 0', background: '#f0f0f0', padding: 10 }}>
+                        <p><strong>Extracted Info:</strong></p>
+                        <pre style={{ whiteSpace: 'pre-wrap' }}>{resumeText}</pre>
+                        <button onClick={handleImportResume} style={{ marginRight: 10 }}>Use This Info</button>
+                    </div>
+                )}
+                
+                <div style={{ marginTop: 20 }}>
+                    <button onClick={() => handleImportResume()} disabled={!globalResume} style={{ marginRight: 10 }}>Start with Resume</button>
+                    <button onClick={handleStartWithoutResume}>Start without Resume</button>
+                </div>
+            </div>
         )}
 
         {viewMode === 'live' && (
-             <div className="flex-grow flex flex-col items-center justify-center relative bg-gradient-to-b from-gray-900 to-black rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
-                {/* Timer */}
-                 <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-white font-mono text-sm border border-white/10 flex items-center gap-2 z-20">
-                     <span className={`w-2 h-2 rounded-full ${duration > durationLimits[durationOption] - 30 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
-                     {formatTime(duration)}
-                 </div>
-
-                 <div className="relative z-10 flex flex-col items-center space-y-8 p-10">
-                     <div className="relative">
-                         {/* Pulse Ring */}
-                         <div className={`absolute inset-0 rounded-full bg-primary-500 blur-xl opacity-20 scale-150 transition-all duration-300 ${isSpeaking ? 'scale-[2.0] opacity-40' : ''}`}></div>
-                         
-                         <div className={`w-40 h-40 rounded-full border-4 ${isSpeaking ? 'border-primary-500 shadow-[0_0_30px_rgba(14,165,233,0.6)]' : 'border-gray-700'} overflow-hidden transition-all duration-300 relative bg-gray-900`}>
-                             <img src={selectedProfile.avatar} alt="Recruiter" className="w-full h-full object-cover" />
-                         </div>
-                     </div>
-                     
-                     <div className="text-center space-y-2">
-                         <h3 className="text-3xl font-bold text-white tracking-tight">{selectedProfile.name}</h3>
-                         <div className="flex flex-col text-gray-300 text-sm">
-                             <span className="font-semibold text-primary-400">{selectedProfile.role}</span>
-                             <span>{selectedJob?.company}</span>
-                         </div>
-                         <p className="text-blue-300/60 text-xs mt-2 animate-pulse font-mono tracking-widest uppercase">{isSpeaking ? "FALANDO" : "OUVINDO"}</p>
-                     </div>
-                 </div>
-
-                 {/* Waveform Visualization (Fake CSS) */}
-                 <div className="absolute bottom-0 left-0 right-0 h-32 flex items-end justify-center space-x-1 pb-8 opacity-50">
-                     {[...Array(20)].map((_, i) => (
-                         <div key={i} className="w-2 bg-primary-500 rounded-t-full transition-all duration-100" style={{ height: isSpeaking ? `${Math.random() * 80 + 20}%` : '10%' }}></div>
-                     ))}
-                 </div>
-
-                 <button onClick={() => endSession()} className="absolute bottom-8 bg-red-600 hover:bg-red-700 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110 z-20 group">
-                     <Icons.Stop />
-                     <span className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Encerrar Chamada</span>
-                 </button>
-             </div>
-        )}
-
-        {viewMode === 'report' && finalReport && (
-            <div className="bg-white/80 dark:bg-dark-800/80 backdrop-blur-md p-8 rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 space-y-8 animate-fade-in overflow-y-auto">
-                <div className="text-center space-y-2">
-                    <div className="inline-block p-4 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-2">
-                         <span className="text-5xl font-black">{finalReport.score}</span><span className="text-xl">/10</span>
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-800 dark:text-white">Análise de Desempenho</h3>
-                    <p className="text-gray-600 dark:text-gray-300 italic">"{finalReport.summary}"</p>
+            <div style={{ textAlign: 'center', padding: 40 }}>
+                <h2>Interview in Progress</h2>
+                <div style={{ fontSize: 40, marginBottom: 20 }}>{formatTime(duration)}</div>
+                <p>Speaking with: <strong>{selectedProfile?.name}</strong> ({selectedProfile?.role})</p>
+                <div style={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Visualizer placeholder */}
+                    {isAudioQueuePlayingRef.current ? "🗣️ AI Speaking..." : "👂 Listening..."}
                 </div>
-
-                {finalReport.scores && (
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                        <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
-                            <div className="text-2xl font-bold text-primary-600">{finalReport.scores.communication}</div>
-                            <div className="text-xs text-gray-500 uppercase">Comunicação</div>
-                        </div>
-                        <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
-                             <div className="text-2xl font-bold text-primary-600">{finalReport.scores.technical}</div>
-                             <div className="text-xs text-gray-500 uppercase">Técnica</div>
-                        </div>
-                         <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
-                             <div className="text-2xl font-bold text-primary-600">{finalReport.scores.cultural}</div>
-                             <div className="text-xs text-gray-500 uppercase">Fit Cultural</div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-xl border border-green-100 dark:border-green-800">
-                        <h4 className="font-bold text-green-800 dark:text-green-300 mb-4 flex items-center gap-2"><Icons.Check /> Pontos Fortes</h4>
-                        <ul className="space-y-2">
-                            {finalReport.strengths.map((s: string, i: number) => (
-                                <li key={i} className="text-sm text-green-700 dark:text-green-400">• {s}</li>
-                            ))}
-                        </ul>
-                    </div>
-                    <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-xl border border-red-100 dark:border-red-800">
-                        <h4 className="font-bold text-red-800 dark:text-red-300 mb-4 flex items-center gap-2"><Icons.Trash /> Pontos a Melhorar</h4>
-                        <ul className="space-y-2">
-                            {finalReport.weaknesses.map((w: string, i: number) => (
-                                <li key={i} className="text-sm text-red-700 dark:text-red-400">• {w}</li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl border border-blue-100 dark:border-blue-800">
-                     <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-4 flex items-center gap-2"><Icons.Sparkles /> Dicas do Especialista</h4>
-                     <ul className="space-y-2">
-                        {finalReport.tips.map((t: string, i: number) => (
-                            <li key={i} className="text-sm text-blue-700 dark:text-blue-400 flex gap-2">
-                                <span>💡</span> {t}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                <details className="group border rounded-lg dark:border-gray-700 bg-white/50 dark:bg-dark-900/50">
-                    <summary className="p-4 cursor-pointer font-bold text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">Ver Transcrição Completa</summary>
-                    <div className="p-4 pt-0 text-sm text-gray-600 dark:text-gray-400 space-y-2 max-h-60 overflow-y-auto font-mono">
-                        {currentTranscriptRef.current.map((line, i) => (
-                            <div key={i} className="border-b border-gray-100 dark:border-gray-800 py-1 last:border-0">{line}</div>
-                        ))}
-                    </div>
-                </details>
-                
-                <button onClick={() => setViewMode('search')} className="w-full py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                    Nova Entrevista
+                <button onClick={endSession} style={{ padding: '10px 20px', background: 'red', color: 'white', border: 'none', borderRadius: 5 }}>
+                    Hang Up
                 </button>
             </div>
         )}
-    </div>
-  );
-};
 
-const VocationalTest = ({ onBack }: { onBack: () => void }) => {
-  const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<any>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [ai, setAi] = useState<GoogleGenAI | null>(null);
-  const [started, setStarted] = useState(false);
-
-  useEffect(() => {
-    const client = new GoogleGenAI({ apiKey: API_KEY });
-    setAi(client);
-    if (!started) {
-        setStarted(true);
-        addMessage('model', "Olá! Sou seu orientador vocacional com IA. Vamos descobrir qual carreira combina com seu perfil. Para começar, me conte: quais são seus principais hobbies e o que você mais gosta de estudar ou ler?");
-    }
-  }, []);
-
-  const addMessage = (role: 'user' | 'model', content: string) => {
-    setMessages(prev => [...prev, { role, content }]);
-    setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    if(role === 'model') {
-        SoundFX.playPop();
-    }
-  };
-
-  const handleSend = async () => {
-      if (!input.trim() || !ai) return;
-      const userText = input;
-      setInput("");
-      addMessage('user', userText);
-      setLoading(true);
-
-      try {
-          const turnCount = messages.filter(m => m.role === 'user').length + 1;
-          const isFinalizing = turnCount >= 5;
-
-          const history = messages.map(m => `${m.role === 'user' ? 'Usuário' : 'Psicólogo'}: ${m.content}`).join('\n');
-          
-          let prompt = "";
-          if (isFinalizing) {
-              prompt = `
-              Atue como um psicólogo vocacional experiente.
-              Baseado na conversa abaixo, gere um relatório JSON final com 3 sugestões de carreira.
-              
-              Conversa:
-              ${history}
-              Usuário: ${userText}
-
-              Formato JSON OBRIGATÓRIO:
-              {
-                  "analysis": "Análise psicológica breve do perfil...",
-                  "careers": [
-                      {"title": "Nome da Carreira", "match": "95%", "reason": "Por que combina..."}
-                  ],
-                  "message": "Uma mensagem final de encerramento inspiradora."
-              }
-              `;
-          } else {
-              prompt = `
-              Atue como um psicólogo vocacional. O objetivo é descobrir a vocação do usuário.
-              Conversa até agora:
-              ${history}
-              Usuário: ${userText}
-              
-              Instruções:
-              1. Analise a resposta.
-              2. Faça UMA nova pergunta exploratória (sobre habilidades, valores, ambiente de trabalho preferido, etc).
-              3. Seja empático e breve.
-              
-              Responda apenas com a sua fala (texto puro).
-              `;
-          }
-
-          const result = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
-              contents: prompt,
-              config: isFinalizing ? { responseMimeType: 'application/json' } : {}
-          });
-
-          const text = result.text || "";
-
-          if (isFinalizing) {
-              try {
-                  const data = JSON.parse(text);
-                  setReport(data);
-                  addMessage('model', data.message || "Análise concluída.");
-              } catch(e) {
-                   console.error("JSON Parse error", e);
-                   addMessage('model', "Concluímos o teste, mas tive um problema ao gerar o relatório visual. " + text);
-              }
-          } else {
-              addMessage('model', text);
-          }
-
-      } catch (e) {
-          console.error(e);
-          addMessage('model', "Desculpe, tive um erro de conexão. Tente novamente.");
-      } finally {
-          setLoading(false);
-      }
-  };
-
-  return (
-    <div className="h-[calc(100vh-140px)] flex flex-col max-w-4xl mx-auto">
-        <div className="flex items-center space-x-2 mb-4">
-            <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"><Icons.Home /></button>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Teste Vocacional IA</h2>
-        </div>
-
-        <div className="flex-grow flex flex-col bg-white/80 dark:bg-dark-800/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 dark:border-gray-700/50 overflow-hidden relative">
-             <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-hide">
-                {messages.map((m, i) => (
-                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${m.role === 'user' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-white dark:bg-dark-700 text-slate-800 dark:text-gray-200 rounded-tl-none border border-gray-200 dark:border-gray-600'}`}>
-                            {m.content}
+        {viewMode === 'report' && finalReport && (
+            <div>
+                <h2>Interview Feedback Report</h2>
+                <div style={{ border: '1px solid #ccc', padding: 20, borderRadius: 10 }}>
+                    <h3>Overall Score: {finalReport.score}/10</h3>
+                    <p>{finalReport.summary}</p>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, margin: '20px 0' }}>
+                        <div>Communication: {finalReport.scores?.communication}</div>
+                        <div>Technical: {finalReport.scores?.technical}</div>
+                        <div>Cultural Fit: {finalReport.scores?.cultural}</div>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                        <div>
+                            <h4>Strengths</h4>
+                            <ul>{finalReport.strengths?.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
+                        </div>
+                        <div>
+                            <h4>Areas for Improvement</h4>
+                            <ul>{finalReport.weaknesses?.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
                         </div>
                     </div>
-                ))}
-                 {loading && (
-                     <div className="flex justify-start">
-                         <TypingIndicator />
-                     </div>
-                 )}
-                 <div ref={scrollRef} />
-             </div>
-
-             {report && (
-                 <div className="absolute inset-0 bg-white/95 dark:bg-dark-900/95 z-20 p-8 overflow-y-auto animate-fade-in flex flex-col">
-                     <h3 className="text-3xl font-bold text-center mb-2 text-primary-600">Seu Mapa Vocacional</h3>
-                     <div className="w-16 h-1 bg-primary-500 mx-auto rounded-full mb-6"></div>
-                     <p className="text-center text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto text-lg leading-relaxed">"{report.analysis}"</p>
-                     
-                     <div className="grid md:grid-cols-3 gap-6 w-full mb-8">
-                         {report.careers?.map((c: any, i: number) => (
-                             <div key={i} className="p-6 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-dark-800 shadow-lg hover:-translate-y-1 transition-transform">
-                                 <div className="flex justify-between items-start mb-3">
-                                     <h4 className="font-bold text-lg text-slate-800 dark:text-white">{c.title}</h4>
-                                     <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">{c.match}</span>
-                                 </div>
-                                 <p className="text-sm text-gray-600 dark:text-gray-400 leading-snug">{c.reason}</p>
-                             </div>
-                         ))}
-                     </div>
-                     
-                     <button onClick={() => { setReport(null); setMessages([]); setStarted(false); }} className="mx-auto bg-primary-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-primary-700 transition-colors shadow-lg flex items-center gap-2">
-                         <Icons.Brain /> Refazer Teste
-                     </button>
-                 </div>
-             )}
-
-             <div className="p-4 bg-white/50 dark:bg-dark-900/50 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-                <div className="flex space-x-2">
-                    <input
-                        type="text"
-                        className="flex-grow bg-white/80 dark:bg-dark-800/80 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 dark:text-white placeholder-gray-400 backdrop-blur-sm disabled:opacity-50"
-                        placeholder="Digite sua resposta..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        disabled={loading || !!report}
-                    />
-                    <button onClick={handleSend} disabled={loading || !!report} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl transition-colors disabled:opacity-50 shadow-md">
-                        <Icons.Send />
-                    </button>
+                    
+                    <h4>Tips</h4>
+                    <ul>{finalReport.tips?.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>
                 </div>
+                <button onClick={() => setViewMode('search')} style={{ marginTop: 20, padding: 10 }}>Back to Jobs</button>
             </div>
-        </div>
+        )}
     </div>
   );
-};
-
-// --- Mount Application ---
-const root = createRoot(document.getElementById('root')!);
-root.render(<App />);
+}
